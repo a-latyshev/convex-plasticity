@@ -2,10 +2,11 @@ import meshio
 import numpy as np
 
 import ufl
-from dolfinx import fem, io, cpp
+from dolfinx import fem, io
 from mpi4py import MPI
 from petsc4py import PETSc
-from pathlib import Path
+from dolfinx.geometry import (BoundingBoxTree, compute_colliding_cells, compute_collisions)
+import time
 
 def create_mesh(mesh, cell_type, prune_z=False):
     cells = mesh.get_cells_type(cell_type)
@@ -14,14 +15,15 @@ def create_mesh(mesh, cell_type, prune_z=False):
     out_mesh = meshio.Mesh(points=points, cells={cell_type: cells}, cell_data={"name_to_read":[cell_data]})
     return out_mesh
 
-#It works with the msh4 only!!
-msh = meshio.read("thick_cylinder.msh")
+if MPI.COMM_WORLD.rank == 0:
+    msh = meshio.read("thick_cylinder.msh")
 
-# Create and save one file for the mesh, and one file for the facets 
-triangle_mesh = create_mesh(msh, "triangle", prune_z=True)
-line_mesh = create_mesh(msh, "line", prune_z=True)
-meshio.write("thick_cylinder.xdmf", triangle_mesh)
-meshio.write("mt.xdmf", line_mesh)
+    # Create and save one file for the mesh, and one file for the facets 
+    triangle_mesh = create_mesh(msh, "triangle", prune_z=True)
+    line_mesh = create_mesh(msh, "line", prune_z=True)
+    meshio.write("thick_cylinder.xdmf", triangle_mesh)
+    meshio.write("mt.xdmf", line_mesh)
+    print(msh)
 
 with io.XDMFFile(MPI.COMM_WORLD, "thick_cylinder.xdmf", "r") as xdmf:
     mesh = xdmf.read_mesh(name="Grid")
@@ -42,7 +44,6 @@ Et = E/100.  # tangent modulus
 H = E*Et/(E-Et)  # hardening modulus
 
 Re, Ri = 1.3, 1.   # external/internal radius
-ds = ufl.Measure("ds", domain=mesh)
 
 deg_u = 2
 deg_stress = 2
@@ -56,16 +57,18 @@ sig = fem.Function(W)
 sig_old = fem.Function(W)
 n_elas = fem.Function(W)
 beta = fem.Function(W0)
-p = fem.Function(W0)# , name="Cumulative plastic strain"
+p = fem.Function(W0, name="Cumulative_plastic_strain")
 dp = fem.Function(W0)
-u = fem.Function(V)#, name="Total displacement"
-du = fem.Function(V)#, name="Iteration correction"
-Du = fem.Function(V)# , name="Current increment"
+u = fem.Function(V, name="Total_displacement")
+du = fem.Function(V, name="Iteration_correction")
+Du = fem.Function(V, name="Current_increment")
 v = ufl.TrialFunction(V)
 u_ = ufl.TestFunction(V)
 
-zero_Du = fem.Function(V)
+P0 = fem.FunctionSpace(mesh, ("DG", 0))
+p_avg = fem.Function(P0, name="Plastic_strain")
 
+zero_Du = fem.Function(V)
 left_marker = 3
 down_marker = 1
 left_facets = ft.indices[ft.values == left_marker]
@@ -78,10 +81,21 @@ bcs = [fem.dirichletbc(PETSc.ScalarType(0), left_dofs, V.sub(0)), fem.dirichletb
 n = ufl.FacetNormal(mesh)
 q_lim = float(2/np.sqrt(3)*np.log(Re/Ri)*sig0.value)
 
+# class Loading:
+#     def __init__(self):
+#         self.q = q_lim
+#         self.t = 0.0
+
+#     def eval(self, x):
+#         return np.full(x.shape[1], -self.q * self.t)
+
+# loading = Loading()
+# load_func.interpolate(loading.eval)
 V_real = fem.FunctionSpace(mesh, ("CG", deg_u))
 loading = fem.Function(V_real)
-loading.interpolate(lambda x: (np.zeros_like(x[1])))
-loading.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+
+# loading.interpolate(lambda x: (np.zeros_like(x[1])))
+# loading.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
 
 def F_ext(v):
     return -loading * ufl.inner(n, v)*ds(4)
@@ -112,12 +126,13 @@ def proj_sig(deps, old_sig, old_p):
     new_sig = sig_elas-beta*s
     return ufl.as_vector([new_sig[0, 0], new_sig[1, 1], new_sig[2, 2], new_sig[0, 1]]), \
            ufl.as_vector([n_elas[0, 0], n_elas[1, 1], n_elas[2, 2], n_elas[0, 1]]), \
-           beta, dp      
+           beta, dp
 
 def sigma_tang(e):
     N_elas = as_3D_tensor(n_elas)
-    return sigma(e) - 3*mu*(3*mu/(3*mu+H)-beta)*ufl.inner(N_elas, e)*N_elas - 2*mu*beta*ufl.dev(e)                                   
+    return sigma(e) - 3*mu*(3*mu/(3*mu+H)-beta)*ufl.inner(N_elas, e)*N_elas - 2*mu*beta*ufl.dev(e)
 
+ds = ufl.Measure("ds", domain=mesh, subdomain_data=ft)
 dx = ufl.Measure(
     "dx",
     domain=mesh,
@@ -125,18 +140,18 @@ dx = ufl.Measure(
 )
 
 a_Newton = ufl.inner(eps(v), sigma_tang(eps(u_)))*dx
-res = ufl.inner(eps(u_), as_3D_tensor(sig))*dx + F_ext(u_)
+res = -ufl.inner(eps(u_), as_3D_tensor(sig))*dx + F_ext(u_)
 
-def project(v, target_func, bcs=[]):
-    # v->target_func
+def project(original_field, target_field, bcs=[]):
+    # original_field -> target_field
     # Ensure we have a mesh and attach to measure
-    V = target_func.function_space
+    V = target_field.function_space
 
     # Define variational problem for projection
     w = ufl.TestFunction(V)
     Pv = ufl.TrialFunction(V)
     a = fem.form(ufl.inner(Pv, w) * dx)
-    L = fem.form(ufl.inner(v, w) * dx)
+    L = fem.form(ufl.inner(original_field, w) * dx)
 
     # Assemble linear system
     A = fem.petsc.assemble_matrix(a, bcs)
@@ -149,59 +164,62 @@ def project(v, target_func, bcs=[]):
     # Solve linear system
     solver = PETSc.KSP().create(A.getComm())
     solver.setOperators(A)
-    solver.solve(b, target_func.vector)
+    solver.solve(b, target_field.vector)  
 
-P0 = fem.FunctionSpace(mesh, ("DG", 0))
-p_avg = fem.Function(P0, name="Plastic strain")
+problem = fem.petsc.LinearProblem(
+    a_Newton,
+    res,
+    bcs=bcs,
+    petsc_options={
+        "pc_type": "lu",
+        "pc_factor_mat_solver_type": "mumps",
+    },
+)
 
-A = fem.petsc.create_matrix(fem.form(a_Newton))
-Res = fem.petsc.create_vector(fem.form(res))
-
-solver = PETSc.KSP().create(mesh.comm)
-solver.setOperators(A)
-solver.setType(PETSc.KSP.Type.PREONLY)
-solver.getPC().setType(PETSc.PC.Type.LU)
-
+# Defining a cell containing (Ri, 0) point, where we calculate a value of u
+cells = []
+points_on_proc = []
+x_point = np.zeros((1, 3))
+x_point[0][0] = Ri
+tree = BoundingBoxTree(mesh, mesh.geometry.dim)
+cell_candidates = compute_collisions(tree, x_point)
+colliding_cells = compute_colliding_cells(mesh, cell_candidates, x_point)
+for i, point in enumerate(x_point):
+    if len(colliding_cells.links(i)) > 0:
+        points_on_proc.append(point)
+        cells.append(colliding_cells.links(i)[0])
+       
 Nitermax, tol = 200, 1e-8  # parameters of the Newton-Raphson procedure
 Nincr = 20
 load_steps = np.linspace(0, 1.1, Nincr+1)[1:]**0.5
 results = np.zeros((Nincr+1, 2))
+xdmf = io.XDMFFile(MPI.COMM_WORLD, "plasticity.xdmf", "w")
+xdmf.write_mesh(mesh)
+
+start = time.time()
+
 for (i, t) in enumerate(load_steps):
     # loading.t = t
     # load_func.interpolate(loading.eval)
     loading.interpolate(lambda x: (t * q_lim * np.ones_like(x[1])))
-    loading.vector.ghostUpdate(
-        addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
-    )
+    loading.x.scatter_forward()
 
-    A.zeroEntries()
-    fem.petsc.assemble_matrix(A, fem.form(a_Newton), bcs=bcs)
-    A.assemble()
+    Res0 = fem.petsc.assemble_vector(fem.form(res))
+    Res0.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+    fem.set_bc(Res0, bcs, du.vector)
 
-    with Res.localForm() as loc_b:
-        loc_b.set(0.)
-    fem.petsc.assemble_vector(Res, fem.form(res))
-    Res.assemble()
-
-    fem.petsc.apply_lifting(Res, [fem.form(a_Newton)], [bcs], x0=[Du.vector], scale=-1.0)
-    Res.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-    fem.petsc.set_bc(Res, bcs, Du.vector, -1.0)
-
-    solver.setOperators(A)
-
-    nRes0 = Res.norm() # Which one?
+    nRes0 = Res0.norm() # Which one? - ufl.sqrt(Res.dot(Res))
+    
     nRes = 1
     zero_Du.vector.copy(Du.vector)
-    Du.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
-    # Du.interpolate(lambda x : (np.zeros_like(x[0]), np.zeros_like(x[1])))
-    # Du.interpolate(fem.Constant(mesh, (ScalarType(0), ScalarType(0))))
-    print("Increment:", str(i+1), ' force: ', t * q_lim)
+    Du.x.scatter_forward()
+    if MPI.COMM_WORLD.rank == 0:
+        print(f"nRes0 , {nRes0} \n Increment: {str(i+1)}, load = {t * q_lim}")
     niter = 0
      
-    while nRes > tol and niter < Nitermax:
-        solver.solve(Res, du.vector) 
+    while nRes/nRes0 > tol and niter < Nitermax:
+        du = problem.solve()
         du.x.scatter_forward() 
-        print('du max = ', du.vector.max())
 
         Du.vector.axpy(1, du.vector) # Du = Du + 1*du
         Du.x.scatter_forward() 
@@ -212,30 +230,43 @@ for (i, t) in enumerate(load_steps):
         project(sig_, sig)
         project(n_elas_, n_elas)
         project(beta_, beta)
-        
-        A.zeroEntries()
-        fem.petsc.assemble_matrix(A, fem.form(a_Newton), bcs=bcs)
-        A.assemble()
-        with Res.localForm() as loc_b:
-            loc_b.set(0)
-        fem.petsc.assemble_vector(Res, fem.form(res))
-        Res.assemble()
 
-        fem.petsc.apply_lifting(Res, [fem.form(a_Newton)], [bcs], x0=[Du.vector], scale=-1.0)
+        Res = fem.petsc.assemble_vector(fem.form(res))
         Res.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-        fem.petsc.set_bc(Res, bcs, Du.vector, -1.0)
+        fem.set_bc(Res, bcs, du.vector)
 
-        solver.setOperators(A)
-
-        nRes = Res.norm()
-        print("    Residual:", nRes, ' dp = ', dp.vector.max())
+        nRes = Res.norm() 
+        if MPI.COMM_WORLD.rank == 0:
+            print(f"    Residual: {nRes}")
         niter += 1
     u.vector.axpy(1, Du.vector) # u = u + 1*Du
-    u.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+    u.x.scatter_forward()
 
     sig.vector.copy(sig_old.vector)
-    sig_old.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+    sig.x.scatter_forward()
 
     project(dp_, dp)
     p.vector.axpy(1, dp.vector)
-    p.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+    p.x.scatter_forward()
+
+    project(p, p_avg)
+    p_avg.x.scatter_forward()
+    
+    xdmf.write_function(u, t)
+    xdmf.write_function(p_avg, t)
+
+    if len(points_on_proc) > 0:
+        results[i+1, :] = (u.eval(points_on_proc, cells)[0], t)
+
+xdmf.close()
+end = time.time()
+print(f'rank#{MPI.COMM_WORLD.rank}: Time = {end-start:.3f} (s)')
+
+if len(points_on_proc) > 0:
+    import matplotlib.pyplot as plt
+    plt.plot(results[:, 0], results[:, 1], "-o")
+    plt.xlabel("Displacement of inner boundary")
+    plt.ylabel(r"Applied pressure $q/q_{lim}$")
+    plt.savefig(f"displacement_rank{MPI.COMM_WORLD.rank:d}.png")
+    plt.show()
+    
