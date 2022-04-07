@@ -186,7 +186,8 @@ sigma_QV2 = fem.Function(QV2)
 project(sigma_xx_, sigma_xx_Q0)
 project(sigma_xx_, sigma_xx_DG0)
 project(sigma_xx_, sigma_xx_DG1)
-sigma_xx_DG1.vector.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+# sigma_xx_DG1.vector.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+sigma_xx_DG1.vector.assemble()
 # project(sigma_vec, sigma_QV0) #failed
 
 # %%
@@ -271,7 +272,7 @@ with io.XDMFFile(MPI.COMM_WORLD, "solution.xdmf", "a", encoding=io.XDMFFile.Enco
     file.write_function(sigma_xx_Q0_interp)
     file.write_function(sigma_xy_Q0_interp)
     file.write_function(sigma_yy_Q0_interp)
-    # file.write_function(sigma_xx_Q2_interp) #failed!
+    file.write_function(sigma_xx_Q2_interp) #failed!
     file.write_function(sigma_DGV0_interp)
     file.write_function(sigma_QV0dim2)
     # file.write_function(sigma_QV0, 0) #failed!
