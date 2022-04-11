@@ -3,7 +3,7 @@ import numpy as np
 
 import ufl
 import basix
-from dolfinx import mesh, fem, io, plot
+from dolfinx import mesh, fem, io
 from ufl import ds, dx
 
 from mpi4py import MPI
@@ -11,7 +11,7 @@ from petsc4py import PETSc
 import pyvista
 
 # %%
-def project(original_field, target_field, bcs=[]):
+def project(original_field, target_field, dx=ufl.dx, bcs=[]):
     # original_field -> target_field
     # Ensure we have a mesh and attach to measure
     V = target_field.function_space
@@ -36,7 +36,6 @@ def project(original_field, target_field, bcs=[]):
     solver.solve(b, target_field.vector)  
     target_field.x.scatter_forward()
 
-
 # %%
 L = 1
 W = 0.1
@@ -53,6 +52,12 @@ g = gamma
 domain = mesh.create_rectangle(comm=MPI.COMM_WORLD,
                             points=((0.0, 0.0), (L, W)), n=(64, 16),
                             cell_type=mesh.CellType.triangle,)
+
+dxm = ufl.Measure(
+    "dx",
+    domain=domain,
+    metadata={"quadrature_degree": 2, "quadrature_scheme": "default"},
+)
 
 deg_u = 1
 deg_stress = 0
@@ -78,6 +83,7 @@ DGV0 = fem.FunctionSpace(domain, DGV0e)
 
 CG1 = fem.FunctionSpace(domain, ('CG', 1))
 V = fem.VectorFunctionSpace(domain, ("Lagrange", deg_u))
+#Q0 == Q1 == DG0
 
 # %%
 num_nodes_global = domain.topology.index_map(domain.topology.dim-2).size_global
@@ -182,12 +188,13 @@ sigma_xy_Q2_interp = fem.Function(Q2)
 sigma_yy_Q2_interp = fem.Function(Q2)
 sigma_QV2 = fem.Function(QV2)
 
+sigma_xx_Q2_CG1 = fem.Function(CG1)
+sigma_xx_Q2_DG1 = fem.Function(DG1)
+
 # %%
 project(sigma_xx_, sigma_xx_Q0)
 project(sigma_xx_, sigma_xx_DG0)
 project(sigma_xx_, sigma_xx_DG1)
-# sigma_xx_DG1.vector.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-sigma_xx_DG1.vector.assemble()
 # project(sigma_vec, sigma_QV0) #failed
 
 # %%
@@ -210,10 +217,25 @@ interpolate_quadrature(sigma_vec, sigma_QV0)
 interpolate_quadrature(sigma_vec2, sigma_QV0dim2)
 interpolate_quadrature(sigma_vec, sigma_QV2)
 
+interpolate_quadrature(sigma_xx_, sigma_xx_Q2_interp)
+
+# %%
+project(sigma_xx_Q2_interp, sigma_xx_Q2_CG1, dx=dxm)
+project(sigma_xx_Q2_interp, sigma_xx_Q2_DG1, dx=dxm)
+
 # %%
 sigma_xx_Q0_interp, sigma_xy_Q0_interp, sigma_yy_Q0_interp = sigma_QV0.split()
 sigma_xx_DG0_interp, sigma_xy_DG0_interp, sigma_yy_DG0_interp = sigma_DGV0_interp.split()
 sigma_xx_Q2_interp, sigma_xy_Q2_interp, sigma_yy_Q2_interp = sigma_QV2.split()
+
+# %%
+print(sigma_QV0.x.array.shape, sigma_xx_Q0_interp.x.array.shape)
+print(sigma_DGV0_interp.x.array.shape, sigma_xx_DG0_interp.x.array.shape)
+
+# %%
+u = fem.Function(V)
+ux, uy = u.split()
+print(u.x.array.shape, ux.x.array.shape)
 
 # %%
 DG0.element.interpolation_points
@@ -253,6 +275,9 @@ sigma_xx_Q2_interp.name = 'sigma xx Q2 interp'
 sigma_xy_Q2_interp.name = 'sigma xy Q2 interp'
 sigma_yy_Q2_interp.name = 'sigma yy Q2 interp'
 
+sigma_xx_Q2_CG1.name = 'sigma xx Q2->CG1'
+sigma_xx_Q2_DG1.name = 'sigma xx Q2->DG1'
+
 sigma_DGV0_interp.name = 'sigma DGV0 interp'
 sigma_QV0dim2.name = 'sigma QV0dim2'
 sigma_QV0.name = "Stress"
@@ -272,10 +297,53 @@ with io.XDMFFile(MPI.COMM_WORLD, "solution.xdmf", "a", encoding=io.XDMFFile.Enco
     file.write_function(sigma_xx_Q0_interp)
     file.write_function(sigma_xy_Q0_interp)
     file.write_function(sigma_yy_Q0_interp)
-    file.write_function(sigma_xx_Q2_interp) #failed!
+    file.write_function(sigma_xx_Q2_CG1)
+    file.write_function(sigma_xx_Q2_DG1)
+    # file.write_function(sigma_xx_Q2_interp) #failed!
     file.write_function(sigma_DGV0_interp)
     file.write_function(sigma_QV0dim2)
     # file.write_function(sigma_QV0, 0) #failed!
+
+# %%
+sigma_xx_DG0.x.array.shape
+
+# %%
+sigma_xx_DG1.x.array.shape
+
+# %%
+sigma_DGV0_interp.x.array.shape
+
+# %%
+sigma_xx_DG0_interp.x.array.shape
+
+# %%
+# import pyvista
+# from dolfinx.plot import create_vtk_mesh
+
+# pyvista.set_jupyter_backend("pythreejs")
+# # plotter = pyvista.Plotter()
+# grid = pyvista.UnstructuredGrid(*create_vtk_mesh(domain, domain.topology.dim))
+
+# # u_grid = pyvista.UnstructuredGrid(u_topology, u_cell_types, u_geometry)
+# # grid.cell_data["sig_xx"] = sigma_xx_DG0.x.array.real
+# grid.field_data["sig_xx"] = sigma_xx_DG0.x.array.real
+# grid.set_active_scalars("sig_xx")
+# u_plotter = pyvista.Plotter()
+# u_plotter.add_mesh(grid, show_edges=False)
+# u_plotter.view_xy()
+# if not pyvista.OFF_SCREEN:
+#     u_plotter.show()
+
+# num_local_cells = domain.topology.index_map(domain.topology.dim).size_local
+# grid.cell_data["Marker"] = ct.values[ct.indices<num_local_cells]
+# grid.set_active_scalars("Marker")
+# actor = plotter.add_mesh(grid, show_edges=True)
+# plotter.view_xy()
+# if not pyvista.OFF_SCREEN:
+#     plotter.show()
+# else:
+#     pyvista.start_xvfb()
+#     cell_tag_fig = plotter.screenshot("cell_tags.png")
 
 # %%
 
