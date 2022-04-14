@@ -79,7 +79,6 @@ bc = dirichletbc(u_bc, bdofs)
 # Elastic stiffness tensor and Poisson ratio
 E, nu = 1.0, 1.0 / 3.0
 
-
 def sigma_u(u):
     """Consitutive relation for stress-strain. Assuming plane-stress in XY"""
     eps = 0.5 * (ufl.grad(u) + ufl.grad(u).T)
