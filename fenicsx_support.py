@@ -45,3 +45,28 @@ def interpolate_quadrature(ufl_expr, fem_func:fem.Function):
     expr_eval = expr_expr.eval(cells)
     fem_func.x.array[:] = expr_eval.flatten()[:]
     fem_func.x.scatter_forward()
+
+# Defining the function to interpolate a function defined over quadrature elements
+def interpolate_quadrature(ufl_expr, q_dim, mesh):
+    basix_celltype = getattr(basix.CellType, mesh.topology.cell_type.name)
+    quadrature_points, weights = basix.make_quadrature(basix_celltype, q_dim)
+    map_c = mesh.topology.index_map(mesh.topology.dim)
+    num_cells = map_c.size_local + map_c.num_ghosts
+    cells = np.arange(0, num_cells, dtype=np.int32)
+
+    expr_expr = fem.Expression(ufl_expr, quadrature_points)
+    expr_eval = expr_expr.eval(cells)
+    return expr_eval
+
+# Interpolate an expression on an element
+def interpolate_quadrature_on_element(expr, function_space:fem.FunctionSpace, mesh, cell_number):
+    assert function_space.family() == 'Quadrature'
+    
+    q_dim = function_space.degree()
+    
+    basix_celltype = getattr(basix.CellType, mesh.topology.cell_type.name)
+    quadrature_points, _ = basix.make_quadrature(basix_celltype, q_dim)
+
+    expr_expr = fem.Expression(expr, quadrature_points)
+    expr_eval = expr_expr.eval(cell_number)
+    return expr_eval
