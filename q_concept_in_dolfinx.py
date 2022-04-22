@@ -17,9 +17,9 @@ def print0(*args, **kwargs):
 try:
     N = int(sys.argv[1])
 except IndexError:
-    N = 2
+    N = 1
 
-mesh = df.mesh.create_unit_square(MPI.COMM_WORLD, N, N, df.mesh.CellType.quadrilateral)
+mesh = df.mesh.create_unit_square(MPI.COMM_WORLD, N, N) #, df.mesh.CellType.quadrilateral
 
 deg, q_deg = 1, 2
 V = df.fem.VectorFunctionSpace(mesh, ("P", deg))
@@ -207,16 +207,16 @@ solver.getPC().setType("lu")
 
 f = df.io.XDMFFile(mesh.comm, "displacements.xdmf", "w")
 f.write_mesh(mesh)
-
-
+ts = np.linspace(0.0, 1.0, 5)
 u_bc_max = 42.0
-for t in np.linspace(0.0, 1.0, 5):
+for t in ts:
     # update value of Dirichlet BC
     u_bc.value = t * u_bc_max
 
     print0(f"Solving {t = :6.3f} with {u_bc.value = :6.3f}...")
 
     evaluate_constitutive_law(u)
+    print('q', q_sigma.x.array[:])
 
     # update matrix (pointless in linear elasticity...)
     A.zeroEntries()
@@ -227,10 +227,15 @@ for t in np.linspace(0.0, 1.0, 5):
     with b.localForm() as b_local:
         b_local.set(0.0)
     df.fem.petsc.assemble_vector(b, R)
+    # print(b[:])
 
     df.fem.apply_lifting(b, [dR], bcs=[bcs], x0=[u.vector], scale=-1.0)
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
     df.fem.set_bc(b, bcs, u.vector, -1.0)
+    # print(b[:])
+
+    print('\nb', b[:])
+    print('\nA', A[:,:])
 
     solver.setOperators(A)
 
@@ -239,7 +244,45 @@ for t in np.linspace(0.0, 1.0, 5):
     solver.solve(b, du.vector)
     u.x.array[:] -= du.x.array[:]
     u.x.scatter_forward()
+    print('\nu',u.x.array[:])
 
     # post processing
     check_solution(u, t * u_bc_max)
     f.write_function(u, t)
+
+# for t in np.linspace(0.0, 1.0, 5):
+    # update value of Dirichlet BC
+# t = 1
+# u_bc.value = t * u_bc_max
+
+# print0(f"Solving {t = :6.3f} with {u_bc.value = :6.3f}...")
+
+# evaluate_constitutive_law(u)
+
+# # update matrix (pointless in linear elasticity...)
+# A.zeroEntries()
+# df.fem.petsc.assemble_matrix(A, dR, bcs=bcs)
+# A.assemble()
+# print(A[:,:])
+
+# # update residual vector
+# with b.localForm() as b_local:
+#     b_local.set(0.0)
+# df.fem.petsc.assemble_vector(b, R)
+
+# df.fem.apply_lifting(b, [dR], bcs=[bcs], x0=[u.vector], scale=-1.0)
+# b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+# df.fem.set_bc(b, bcs, u.vector, -1.0)
+# print(u.x.array[:])
+
+# solver.setOperators(A)
+
+# # Solve for the displacement increment du, apply it and udpate ghost values
+# du = df.fem.Function(V)  # Should be outside of loop, instructive here.
+# solver.solve(b, du.vector)
+# u.x.array[:] -= du.x.array[:]
+# u.x.scatter_forward()
+
+# # post processing
+# check_solution(u, t * u_bc_max)
+# f.write_function(u, t)
