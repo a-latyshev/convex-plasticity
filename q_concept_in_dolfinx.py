@@ -17,7 +17,7 @@ def print0(*args, **kwargs):
 try:
     N = int(sys.argv[1])
 except IndexError:
-    N = 1
+    N = 2
 
 mesh = df.mesh.create_unit_square(MPI.COMM_WORLD, N, N) #, df.mesh.CellType.quadrilateral
 
@@ -59,12 +59,18 @@ def eps(u):
     e = ufl.sym(ufl.grad(u))
     return ufl.as_vector((e[0, 0], e[1, 1], 2 * e[0, 1]))
 
+E, nu = 20000, 0.3
+
+# Hookes law for plane stress
+C11 = E / (1.0 - nu * nu)
+C12 = C11 * nu
+C33 = C11 * 0.5 * (1.0 - nu)
+C = np.array([[C11, C12, 0.0], [C12, C11, 0.0], [0.0, 0.0, C33]], dtype=PETSc.ScalarType)
+C_const = df.fem.Constant(mesh, C)
 
 R = df.fem.form(ufl.inner(eps(u_), q_sigma) * dxm)
-dR = df.fem.form(ufl.inner(eps(du), ufl.dot(q_dsigma, eps(u_))) * dxm)
+dR = df.fem.form(ufl.inner(eps(du), ufl.dot(C_const, eps(u_))) * dxm)
 
-
-E, nu = 20000, 0.3
 
 
 def evaluate_constitutive_law(u):
@@ -153,6 +159,24 @@ bcs = [
     df.fem.dirichletbc(PETSc.ScalarType(0), b_dofs_o, V.sub(1)),
 ]
 
+bc_dofs = np.concatenate((b_dofs_l, b_dofs_r, b_dofs_o))
+
+map_c = mesh.topology.index_map(mesh.topology.dim)
+num_cells = map_c.size_local + map_c.num_ghosts
+N_dofs_element = V.element.space_dimension
+N_sub_spaces = V.num_sub_spaces # == V.dofmap.index_map_bs
+dofmap = V.dofmap.list.array.reshape(num_cells, int(N_dofs_element/N_sub_spaces))
+
+#This dofmap takes into account dofs of the vector field
+dofmap_tmp = (N_sub_spaces*np.repeat(dofmap, N_sub_spaces).reshape(-1, N_sub_spaces) + np.arange(N_sub_spaces)).reshape(-1, N_dofs_element).astype(np.dtype(PETSc.IntType))      
+
+print(f'rank = {MPI.COMM_WORLD.rank}, num of cells {num_cells}')
+print('global n cells = ', map_c.size_global)
+print('u shape = ', u.x.array.shape)
+print('q shape = ', q_sigma.x.array.shape)
+print('dofs:', bc_dofs)
+
+print(f'dofmap = \n{dofmap}, \n dofmap_vec = \n{dofmap_tmp}')
 
 def check_solution(u, u_bc_value):
     """
@@ -216,7 +240,9 @@ for t in ts:
     print0(f"Solving {t = :6.3f} with {u_bc.value = :6.3f}...")
 
     evaluate_constitutive_law(u)
-    print('q', q_sigma.x.array[:])
+    q_sigma.x.array[:] = np.full_like(q_sigma.x.array[:], 1)
+    # print('q', q_sigma.x.array[:].reshape(-1, 3))
+
 
     # update matrix (pointless in linear elasticity...)
     A.zeroEntries()
@@ -227,15 +253,22 @@ for t in ts:
     with b.localForm() as b_local:
         b_local.set(0.0)
     df.fem.petsc.assemble_vector(b, R)
+    print(b[:].reshape(-1, 3))
     # print(b[:])
 
-    df.fem.apply_lifting(b, [dR], bcs=[bcs], x0=[u.vector], scale=-1.0)
+    # df.fem.apply_lifting(b, [dR], bcs=[bcs], x0=[u.vector], scale=-1.0)
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
     df.fem.set_bc(b, bcs, u.vector, -1.0)
-    # print(b[:])
 
-    print('\nb', b[:])
-    print('\nA', A[:,:])
+    # print('\nb', b[:])
+    # A_dense = A.convert("dense")
+    # A.setType("aij")
+    # A.setUp()
+    # ai, aj, av = A.getValuesCSR()
+    # print('\nA',ai)
+    # print('\nA',aj)
+    # print('\nA',av)
+    # print('\n', b[:])
 
     solver.setOperators(A)
 
@@ -244,10 +277,10 @@ for t in ts:
     solver.solve(b, du.vector)
     u.x.array[:] -= du.x.array[:]
     u.x.scatter_forward()
-    print('\nu',u.x.array[:])
+    # print('\nu', u.x.array[:])
 
     # post processing
-    check_solution(u, t * u_bc_max)
+    # check_solution(u, t * u_bc_max)
     f.write_function(u, t)
 
 # for t in np.linspace(0.0, 1.0, 5):

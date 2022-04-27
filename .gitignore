@@ -3,3 +3,11 @@
 *.html
 __pycache__/
 *.png
+**/_petsc_**
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.pdf
+*.synctex.gz
