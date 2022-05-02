@@ -339,7 +339,7 @@ def get_local_dofs_bc(pos, bc_dofs):
                 dofs_bc.append(i)
     return dofs_bc
 
-@numba.njit
+@numba.njit(cache=True)
 def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, bc_dofs, N_dofs_element,
                  N_coeffs_values_local_A, tabulated_coeffs_A, coeffs_constants_A, constants_values_A, 
                  N_coeffs_values_local_b, tabulated_coeffs_b, coeffs_constants_b, constants_values_b,
@@ -423,9 +423,9 @@ def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, bc_dofs, N_
                  ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
                
         # Taking into account Dirichlet BCs
-        for i in get_local_dofs_bc(pos, bc_dofs): 
-            A_local[i,:] = 0
-            A_local[:,i] = 0
+        # for i in get_local_dofs_bc(pos, bc_dofs): 
+        #     A_local[i,:] = 0
+        #     A_local[:,i] = 0
 
         MatSetValues_ctypes(A, N_dofs_element, rows.ctypes, N_dofs_element, cols.ctypes, A_local.ctypes, mode)
 
@@ -490,7 +490,6 @@ q_dsigma.vector.set(0)
 u_bc_max = 42.0
 ts = np.linspace(0.0, 1.0, 5)
 
-start = time.time()
 
 for t in ts:
     # update value of Dirichlet BC
@@ -515,13 +514,14 @@ for t in ts:
     with b.localForm() as b_local:
         b_local.set(0.0)
 
+    start = time.time()
     assemble_ufc(A.handle, b.array, u.x.array, x_dofs, x, dofmap_topological, num_owned_cells, bc_dofs, N_dofs_element,
                  N_coeffs_values_local_A, tabulated_coeffs_A, coeffs_constants_A, constants_values_A, 
                  N_coeffs_values_local_b, tabulated_coeffs_b, coeffs_constants_b, constants_values_b,
                  kernel_A, kernel_b)
+    print(f'iter = {t}, time = {time.time() - start}')
     A.assemble()
-    for i in bc_dofs:
-        A.setValueLocal(i, i, 1)
+    A.zeroRowsColumns(bc_dofs, 1.)
     A.assemble()
 
     fem.apply_lifting(b, [fem.form(dR)], bcs=[bcs], x0=[u.vector], scale=-1.0)
@@ -535,11 +535,10 @@ for t in ts:
     solver.solve(b, du.vector)
     u.x.array[:] -= du.x.array[:]
     u.x.scatter_forward()
-    print(f'rank = {MPI.COMM_WORLD.rank}, u = \n {u.x.array[:]}')
+    # print(f'rank = {MPI.COMM_WORLD.rank}, u = \n {u.x.array[:]}')
 
     # post processing
     f.write_function(u, t)
 
-print(f'time = {time.time() - start}')
 
 f.close()
