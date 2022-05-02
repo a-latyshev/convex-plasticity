@@ -343,7 +343,7 @@ dofmap = V.dofmap.list.array.reshape(num_cells, int(N_dofs_element/N_sub_spaces)
 #This dofmap takes into account dofs of the vector field
 dofmap_tmp = (N_sub_spaces*np.repeat(dofmap, N_sub_spaces).reshape(-1, N_sub_spaces) + np.arange(N_sub_spaces)).reshape(-1, N_dofs_element).astype(np.dtype(PETSc.IntType))        
 
-print(f'dofmap = \n{dofmap}, \n dofmap_vec = \n{dofmap_tmp}')
+# print(f'dofmap = \n{dofmap}, \n dofmap_vec = \n{dofmap_tmp}')
 
 # dofs_sub0 = V.sub(0).dofmap.list.array.reshape(num_cells, int(N_dofs_element/N_sub_spaces))
 # print(dofs_sub0)
@@ -368,7 +368,7 @@ def assemble_ufc(A, b, u_values, q_sigma_values, dofs, coords, dofmap, num_cells
                  N_coeffs_values_local_b, tabulated_coeffs_b, coeffs_constants_b, constants_values_b,
                  kernel_A, kernel_b,
                  mode):
-    num_cells = len(dofmap) # in parallel ?            
+    # num_cells = len(dofmap) # in parallel ?            
     entity_local_index = np.array([0], dtype=np.intc)
     perm = np.array([0], dtype=np.uint8)
     geometry = np.zeros((3, 3))
@@ -378,7 +378,7 @@ def assemble_ufc(A, b, u_values, q_sigma_values, dofs, coords, dofmap, num_cells
     coeffs_b = np.full(9, 1, dtype=PETSc.ScalarType) #In fact coeffs_b = q_sigma_local = C @ eps_local
     constants = C #np.array(C, dtype=PETSc.ScalarType)
 
-    # N_coeffs_b = N_coeffs_values_local_b.size
+    N_coeffs_b = N_coeffs_values_local_b.size
     # N_coeffs_A = N_coeffs_values_local_A.size
 
     # coeffs_A = np.zeros(1, dtype=PETSc.ScalarType) if N_coeffs_A == 0 else \
@@ -393,21 +393,20 @@ def assemble_ufc(A, b, u_values, q_sigma_values, dofs, coords, dofmap, num_cells
     for cell in range(num_cells):
         pos = rows = cols = dofmap[cell]
 
-        geometry = coords[dofs[cell]]
+        geometry[:] = coords[dofs[cell],:]
         b_local.fill(0.)
         A_local.fill(0.)
-        # u_local = u_values[dofmap[cell]]
+        u_local = u_values[pos]
 
         coeffs_A.fill(0.)
-        # coeffs_b.fill(0.)
+        coeffs_b.fill(0.)
         # coeffs_b = q_sigma_values.reshape(num_cells, -1)[cell]
-        # coeffs_b = np.full(9, 1)
         
-        # for i in np.arange(N_coeffs_b):
-        #     tabulated_coeffs_b[i](ffi.from_buffer(coeffs_b[i*N_coeffs_values_local_b[i]:(i+1)*N_coeffs_values_local_b[i]]), 
-        #                           ffi.from_buffer(u_local), 
-        #                           ffi.from_buffer(coeffs_constants_b[i]), 
-        #                           ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
+        for i in np.arange(N_coeffs_b):
+            tabulated_coeffs_b[i](ffi.from_buffer(coeffs_b[i*N_coeffs_values_local_b[i]:(i+1)*N_coeffs_values_local_b[i]]), 
+                                  ffi.from_buffer(u_local), 
+                                  ffi.from_buffer(coeffs_constants_b[i]), 
+                                  ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
 
         # for i in np.arange(N_coeffs_A):
         #     tabulated_coeffs_A[i](ffi.from_buffer(coeffs_A[i*N_coeffs_values_local_A[i]:(i+1)*N_coeffs_values_local_A[i]]), 
@@ -426,17 +425,17 @@ def assemble_ufc(A, b, u_values, q_sigma_values, dofs, coords, dofmap, num_cells
 
         b[pos] += b_local
         
-        # kernel_A(ffi.from_buffer(A_local), 
-        #          ffi.from_buffer(coeffs_A),
-        #          ffi.from_buffer(constants),
-        #          ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
+        kernel_A(ffi.from_buffer(A_local), 
+                 ffi.from_buffer(coeffs_A),
+                 ffi.from_buffer(constants),
+                 ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
                
         # Taking into account Dirichlet BCs
-        # for i in get_dofs_bc(pos, bc_dofs):
-        #     A_local[i,:] = 0
-        #     A_local[:,i] = 0
+        for i in get_dofs_bc(pos, bc_dofs):
+            A_local[i,:] = 0
+            A_local[:,i] = 0
 
-        # MatSetValues_ctypes(A, N_dofs_element, rows.ctypes, N_dofs_element, cols.ctypes, A_local.ctypes, mode)
+        MatSetValues_ctypes(A, N_dofs_element, rows.ctypes, N_dofs_element, cols.ctypes, A_local.ctypes, mode)
 
 # assemble_ufc(A.handle, b.array, u.x.array, q_sigma.x.array, x_dofs, x, dofmap_topological, num_owned_cells, 
 #              N_coeffs_values_local_A, tabulated_coeffs_A, coeffs_constants_A, constants_values_A,  
@@ -464,6 +463,12 @@ b = fem.petsc.create_vector(fem.form(R))
 with b.localForm() as b_local:
     b_local.set(0.0)
 
+A0 = fem.petsc.create_matrix(fem.form(dR))
+A0.zeroEntries()
+b0 = fem.petsc.create_vector(fem.form(R))
+with b0.localForm() as b_local:
+    b_local.set(0.0)
+
 solver = PETSc.KSP().create(domain.comm)
 solver.setType("preonly")
 solver.getPC().setType("lu")
@@ -489,7 +494,7 @@ for t in ts:
     n_gauss = len(strain_matrix) #global in the domain
 
     q_sigma.x.array[:] = (strain_matrix @ C).flatten()
-    q_sigma.x.array[:] = np.full_like(q_sigma.x.array[:], 1)
+    # q_sigma.x.array[:] = np.full_like(q_sigma.x.array[:], 1)
 
     q_dsigma.x.array[:] = np.tile(C.flatten(), n_gauss)
     q_sigma.x.scatter_forward()
@@ -500,49 +505,60 @@ for t in ts:
 
     # print('q', q_sigma.x.array[:].reshape(-1, 3))
 
-    # update matrix (pointless in linear elasticity...)
+    A0.zeroEntries()
+    with b0.localForm() as b_local:
+        b_local.set(0.0)
+
+    fem.petsc.assemble_matrix(A0, fem.form(dR), bcs=bcs)
+    A0.assemble()
+
+    fem.petsc.assemble_vector(b0, fem.form(R))
+    fem.apply_lifting(b0, [fem.form(dR)], bcs=[bcs], x0=[u.vector], scale=-1.0)
+    b0.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+    fem.set_bc(b0, bcs, u.vector, -1.0)
+
     A.zeroEntries()
-    # update residual vector
     with b.localForm() as b_local:
         b_local.set(0.0)
 
-    fem.petsc.assemble_matrix(A, fem.form(dR), bcs=bcs)
-    A.assemble()
-    # assemble_ufc(A.handle, b.array, u.x.array, q_sigma_values, eps_calculated, (x_dofs, x), dofmap_tmp, num_owned_cells, b_tabulated_coeffs, b_N_coeffs_values_local, PETSc.InsertMode.ADD_VALUES)
     assemble_ufc(A.handle, b.array, u.x.array, q_sigma.x.array, x_dofs, x, dofmap_tmp, num_owned_cells, 
                  N_coeffs_values_local_A, tabulated_coeffs_A, coeffs_constants_A, constants_values_A, 
                  N_coeffs_values_local_b, tabulated_coeffs_b, coeffs_constants_b, constants_values_b,
                  kernel_A, kernel_b, PETSc.InsertMode.ADD_VALUES)
-    print(b[:].reshape(-1, 3))
-    # A.assemble()
-    # for i in bc_dofs:
-    #     A[i,i] = 1
-    # A.assemble()
-    # fem.petsc.assemble_matrix(A, fem.form(dR), bcs=bcs)
-    # A.assemble()
 
-    # fem.petsc.assemble_vector(b, fem.form(R))
-    # fem.apply_lifting(b, [fem.form(dR)], bcs=[bcs], x0=[u.vector], scale=-1.0)
+    A.assemble()
+    for i in bc_dofs:
+        # A[i,i] = 1
+        A.setValueLocal(i, i, 1)
+    A.assemble()
+
+    fem.apply_lifting(b, [fem.form(dR)], bcs=[bcs], x0=[u.vector], scale=-1.0)
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-
     fem.set_bc(b, bcs, u.vector, -1.0)
 
     ai, aj, av = A.getValuesCSR()
-    # print('\nA',ai)
-    # print('\nA',aj)
-    # print('\nA',av)
-    solver.setOperators(A)
+    a0i, a0j, a0v = A0.getValuesCSR()
+    # print(a0i, '\n', a0j)
+    # print(a0i.shape, a0j.shape, a0v.shape)
+    # print(f'rank = {MPI.COMM_WORLD.rank}, real = \n{a0v}')
+    # print(f'rank = {MPI.COMM_WORLD.rank}, calcul = \n{av}')
+    # print(f'rank = {MPI.COMM_WORLD.rank}, diff = \n{(av - a0v)}')
 
-    # with b.localForm() as b_local:
-    #     print(b_local[:])
+    # print(f'rank = {MPI.COMM_WORLD.rank}, real = \n{b0.array[:]}')
+    # print(f'rank = {MPI.COMM_WORLD.rank}, calcul = \n{b.array[:]}')
+
+    solver.setOperators(A0)
+    solver.setOperators(A)
 
     # Solve for the displacement increment du, apply it and udpate ghost values
     du = fem.Function(V)  # Should be outside of loop, instructive here.
     solver.solve(b, du.vector)
     u.x.array[:] -= du.x.array[:]
     u.x.scatter_forward()
-    # print('\nu', u.x.array[:])
+    print('\nu', u.x.array[:])
 
+
+    # print(u.vector.size, u.vector.sizes, u.x.array.shape)
     # post processing
     f.write_function(u, t)
 
