@@ -153,7 +153,7 @@ class CustomFunction(fem.Function):
         self.tabulated_expression = self.expression._ufcx_expression.tabulate_tensor_float64
 
 # %%
-N = 20
+N = 2
 domain = mesh.create_unit_square(MPI.COMM_WORLD, N, N)#, mesh.CellType.quadrilateral
 
 deg, q_deg = 1, 2
@@ -339,7 +339,7 @@ def get_local_dofs_bc(pos, bc_dofs):
                 dofs_bc.append(i)
     return dofs_bc
 
-@numba.njit(cache=True)
+@numba.njit
 def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, bc_dofs, N_dofs_element,
                  N_coeffs_values_local_A, tabulated_coeffs_A, coeffs_constants_A, constants_values_A, 
                  N_coeffs_values_local_b, tabulated_coeffs_b, coeffs_constants_b, constants_values_b,
@@ -514,14 +514,17 @@ for t in ts:
     with b.localForm() as b_local:
         b_local.set(0.0)
 
-    start = time.time()
+    # start = time.time()
     assemble_ufc(A.handle, b.array, u.x.array, x_dofs, x, dofmap_topological, num_owned_cells, bc_dofs, N_dofs_element,
                  N_coeffs_values_local_A, tabulated_coeffs_A, coeffs_constants_A, constants_values_A, 
                  N_coeffs_values_local_b, tabulated_coeffs_b, coeffs_constants_b, constants_values_b,
                  kernel_A, kernel_b)
-    print(f'iter = {t}, time = {time.time() - start}')
+    # print(f'iter = {t}, time = {time.time() - start}')
     A.assemble()
-    A.zeroRowsColumns(bc_dofs, 1.)
+    # for i in bc_dofs:
+    #     A.setValueLocal(i, i, 1)
+    # A.zeroRowsColumnsL(bc_dofs, 1.)
+    A.zeroRowsColumnsLocal(bc_dofs, 1.)
     A.assemble()
 
     fem.apply_lifting(b, [fem.form(dR)], bcs=[bcs], x0=[u.vector], scale=-1.0)
@@ -535,7 +538,7 @@ for t in ts:
     solver.solve(b, du.vector)
     u.x.array[:] -= du.x.array[:]
     u.x.scatter_forward()
-    # print(f'rank = {MPI.COMM_WORLD.rank}, u = \n {u.x.array[:]}')
+    print(f'rank = {MPI.COMM_WORLD.rank}, u = \n {u.x.array[:]}')
 
     # post processing
     f.write_function(u, t)
