@@ -140,7 +140,7 @@ class CustomFunction(fem.Function):
             
             The 6th argument (`permutation`) is an elements permutation option.           
     """
-    def __init__(self, V: fem.FunctionSpace, input_ufl_expression, derivative: fem.function.Constant, get_eval):
+    def __init__(self, V: fem.FunctionSpace, input_ufl_expression, coefficients, get_eval):
         """Inits `CustomFunction`"""
         
         super().__init__(V)
@@ -148,7 +148,11 @@ class CustomFunction(fem.Function):
         self.global_values = self.x.array.reshape((-1, self.local_dim)) #but local on a process
 
         self.input_ufl_expression = input_ufl_expression
-        self.derivative = derivative
+        # self.derivative = derivative
+        self.coefficients = []
+
+        for coeff in coefficients:
+            self.add_coefficient(coeff)
         
         if V._ufl_element.family() == 'Quadrature':
             basix_celltype = getattr(basix.CellType, V.mesh.topology.cell_type.name)
@@ -160,9 +164,21 @@ class CustomFunction(fem.Function):
         self.tabulated_input_expression = self.input_expression._ufcx_expression.tabulate_tensor_float64
 
         self.eval = get_eval(self)
+
     
     def set_values(self, cell, values):
         self.global_values[cell][:] = values
+
+    def add_coefficient(self, coeff:fem.Function, coeff_name:typing.Optional[str] = None):
+        if coeff not in self.coefficients:
+            name = ''
+            if coeff_name is None:
+                name = coeff.name
+            else:
+                name = coeff_name
+            setattr(self, name, coeff)
+            
+            self.coefficients.append(getattr(self, name))
 
 @numba.cfunc(c_signature, nopython=True)
 def dummy_tabulated(b_, w_, c_, coords_, local_index, orientation):
@@ -184,7 +200,7 @@ def extract_constants(ufl_expression) -> np.ndarray:
     constants_values = np.concatenate([const.value.flatten() for const in constants]) if len(constants) !=0 else np.zeros(0, dtype=PETSc.ScalarType)
     return constants_values
 
-def extract_coefficients_and_constants(form: ufl.form.Form) -> typing.Union[np.ndarray, list, list, np.ndarray]:
+def extract_data(form: ufl.form.Form) -> typing.Union[np.ndarray, list, list, np.ndarray]:
     """Extracts coefficients and constants of a given form and puts their values all together 
 
     Args:
@@ -204,34 +220,90 @@ def extract_coefficients_and_constants(form: ufl.form.Form) -> typing.Union[np.n
     N_coeffs = len(form.coefficients())
     N_coeffs_values_local = np.zeros(N_coeffs)
     coeffs_eval = []
-    coeffs_constants = []
-    ceoffs_values_global = []
+    coeffs_input_expression_constants = []
+    coeffs_values_global = []
+    coeffs_dummy_values = []
 
     for i, coeff in enumerate(form.coefficients()):
-        N_coeffs_values_local[i] = coeff.local_dim
-        coeffs_eval.append(coeff.eval)
-        coeffs_constants.append(extract_constants(coeff.input_ufl_expression)) #whatif not all of them are Custom
-        ceoffs_values_global.append(coeff.global_values)
+        if isinstance(coeff, CustomFunction): 
+            N_coeffs_values_local[i] = coeff.local_dim
+            coeffs_eval.append(coeff.eval)
+            for dummy_func in coeff.coefficients:
+                coeffs_dummy_values.append(dummy_func.value)
+            coeffs_input_expression_constants.append(extract_constants(coeff.input_ufl_expression))
+            coeffs_values_global.append(coeff.global_values)
 
     #Numba doesn't like empty lists, so we have to fill it with something 
     if len(coeffs_eval) == 0 :
         coeffs_eval.append(dummy_eval)
 
-    if len(coeffs_constants) == 0 :
-        coeffs_constants.append(np.array([-1], dtype=PETSc.ScalarType))
+    if len(coeffs_input_expression_constants) == 0 :
+        coeffs_input_expression_constants.append(np.array([-1], dtype=PETSc.ScalarType))
 
-    if len(ceoffs_values_global) == 0 :
-        ceoffs_values_global.append(np.array([[-1], [-1]], dtype=PETSc.ScalarType))
+    if len(coeffs_values_global) == 0 :
+        coeffs_values_global.append(np.array([[-1], [-1]], dtype=PETSc.ScalarType))
         
+    if len(coeffs_dummy_values) == 0 :
+        coeffs_dummy_values.append(np.array([[-1], [-1]], dtype=PETSc.ScalarType))
+        
+
     constants_values = extract_constants(form)
             
-    return N_coeffs_values_local, ceoffs_values_global, coeffs_eval, coeffs_constants, constants_values
+    return N_coeffs_values_local, coeffs_values_global, coeffs_eval, coeffs_input_expression_constants, coeffs_dummy_values, constants_values
+
+# def extract_data_b(form: ufl.form.Form):
+#     """Extracts coefficients and constants of a given form and puts their values all together 
+
+#     Args:
+#         form: linear or bilinear form
+    
+#     Returns: an union of:
+#         N_coeffs_values_local: an array containing number of local values of all form coefficients
+#         tabulated_coeffs: a list with coefficients c-function of their ufl-expressions
+#         coeffs_contants: a list with flatten arrays of all constants presenting in the form coefficient
+#         constants_values: a flatten array with values of all constants of the form
+
+#     Note:
+#         It is assumed that all form coefficients are `CustomFunction`, which have their own constants `fem.function.Constant`.
+#         and in the same time its haven't their own coefficients.
+
+#     """
+#     N_coeffs = len(form.coefficients())
+#     N_coeffs_values_local = np.zeros(N_coeffs)
+#     coeffs_eval = []
+#     coeffs_input_expression_constants = []
+#     ceoffs_values_global = []
+#     coeffs_fem_functions = []
+
+#     for i, coeff in enumerate(form.coefficients()):
+#         if isinstance(coeff, CustomFunction): 
+#             N_coeffs_values_local[i] = coeff.local_dim
+#             coeffs_eval.append(coeff.eval)
+#             coeffs_fem_functions.append(coeff.coefficients)
+#             coeffs_input_expression_constants.append(extract_constants(coeff.input_ufl_expression))
+#             ceoffs_values_global.append(coeff.global_values)
+
+#     #Numba doesn't like empty lists, so we have to fill it with something 
+#     if len(coeffs_eval) == 0 :
+#         coeffs_eval.append(dummy_eval)
+
+#     if len(coeffs_input_expression_constants) == 0 :
+#         coeffs_input_expression_constants.append(np.array([-1], dtype=PETSc.ScalarType))
+
+#     if len(ceoffs_values_global) == 0 :
+#         ceoffs_values_global.append(np.array([[-1], [-1]], dtype=PETSc.ScalarType))
+        
+#     constants_values = extract_constants(form)
+            
+#     return N_coeffs_values_local, ceoffs_values_global, coeffs_eval, coeffs_input_expression_constants, coeffs_fem_functions, constants_values
+
 
 @numba.njit
 def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_element,
-                 N_coeffs_values_local_A, ceoffs_values_global_A, coeffs_eval_A, coeffs_constants_A, constants_values_A,
-                 N_coeffs_values_local_b, ceoffs_values_global_b, coeffs_eval_b, coeffs_constants_b, constants_values_b,
-                 kernel_A, kernel_b,
+                 N_coeffs_values_local_A, coeffs_values_global_A, coeffs_eval_A, coeffs_constants_A, coeffs_dummy_values_A, constants_values_A,
+                 N_coeffs_values_local_b, coeffs_values_global_b, coeffs_eval_b, coeffs_constants_b, coeffs_dummy_values_b, constants_values_b,
+                 kernel_A, kernel_b, 
+                 g, scale, x0, 
                  mode=PETSc.InsertMode.ADD_VALUES):
     """Assembles the matrix A and the vector b using FFCx/UFC approach 
 
@@ -275,50 +347,72 @@ def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_elem
 
     b_local = np.zeros(N_dofs_element, dtype=PETSc.ScalarType)
     A_local = np.zeros((N_dofs_element, N_dofs_element), dtype=PETSc.ScalarType)
-    
+
+    # coeffs_dummy_values = np.zeros_like(coeffs_A, dtype=PETSc.ScalarType)
+
     for cell in range(num_owned_cells):
         pos = rows = cols = dofmap[cell]
         geometry[:] = coords[geo_dofs[cell], :]
         u_local = u[pos]
+        x0_local = x0[pos]
+        g_local = g[pos]
 
         b_local.fill(0.)
         A_local.fill(0.)
         coeffs_A.fill(0.)
         coeffs_b.fill(0.)
 
-        for i in range(N_coeffs_b):
-            this_coeff_values = coeffs_b[i*N_coeffs_values_local_b[i]:(i+1)*N_coeffs_values_local_b[i]]
-            coeffs_eval_b[i](this_coeff_values, 
-                             u_local, 
-                             coeffs_constants_b[i], 
-                             geometry, entity_local_index, perm)
-            
-            ceoffs_values_global_b[i][cell][:] = this_coeff_values
+        # for i in range(N_coeffs_b):
+        this_coeff_values = coeffs_b
+        coeffs_dummy_values = coeffs_eval_b[0](this_coeff_values, 
+                                 u_local, 
+                                 coeffs_constants_b[0], 
+                                 geometry, entity_local_index, perm)
 
-        for i in range(N_coeffs_A):
-            this_coeff_values = coeffs_A[i*N_coeffs_values_local_A[i]:(i+1)*N_coeffs_values_local_A[i]]
+        # for dummy_coeff, new_dummy_coeff in zip(coeffs_dummy_values_b, coeffs_dummy_values):
+        #     dummy_coeff[:] = new_dummy_coeff ## == C
 
-            coeffs_eval_A[i](this_coeff_values, 
-                             u_local, 
-                             coeffs_constants_A[i], 
-                             geometry, entity_local_index, perm)
 
-            ceoffs_values_global_A[i][cell][:] = this_coeff_values
+        coeff_dummy_values_b = coeffs_dummy_values_b[0] 
+        coeff_dummy_values = coeffs_dummy_values[0]
+        coeff_dummy_values_b = coeff_dummy_values
+        # coeffs_values_global_b[0][cell][:] = this_coeff_values ## == q_sigma_local
+        this_coeff_values = coeffs_values_global_b[0][cell][:] ## == q_sigma_local
 
+        # print(coeff_dummy_values_b.reshape((3,3,3)), '\n')
+        # print(this_coeff_values)
+
+        # print(this_coeff_values.shape, coeffs_values_global_b[0][cell][:].shape, coeffs_dummy_values_b[0][:].shape, coeffs_dummy_values[0].shape)
+        # for i in range(N_coeffs_A):
+        #     this_coeff_values = coeffs_A[i*N_coeffs_values_local_A[i]:(i+1)*N_coeffs_values_local_A[i]]
+
+        #     coeffs_eval_A[i](this_coeff_values, 
+        #                      u_local, 
+        #                      coeffs_constants_A[i], 
+        #                      geometry, entity_local_index, perm)
+
+        #     coeffs_values_global_A[i][cell][:] = this_coeff_values
 
         kernel_b(ffi.from_buffer(b_local), 
-                 ffi.from_buffer(coeffs_b),
+                 ffi.from_buffer(this_coeff_values),
                  ffi.from_buffer(constants_values_b),
                  ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
-
-        b[pos] += b_local
         
         kernel_A(ffi.from_buffer(A_local), 
-                 ffi.from_buffer(coeffs_A),
+                 ffi.from_buffer(coeff_dummy_values_b),
                  ffi.from_buffer(constants_values_A),
                  ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
-               
+        
+        #Local apply lifting : b_local - scale * A_local_brut(g_local - x0_local)
+        b_local -= scale * A_local @ ( g_local - x0_local )
+        # print(b_local)
+        # print(g_local - x0_local)
+        # print(A_local)
+        # print(scale * A_local @ ( g_local - x0_local ))
+        b[pos] += b_local
+
         MatSetValues_ctypes(A, N_dofs_element, rows.ctypes, N_dofs_element, cols.ctypes, A_local.ctypes, mode)
+        # print(A_local, '\n')
 
 def get_topological_dofmap(V:fem.function.FunctionSpace):
     """Makes a topological dofmap for a vector function space
@@ -360,6 +454,14 @@ class CustomSolver:
         self.b = fem.petsc.create_vector(self.b_form)
         self.A = fem.petsc.create_matrix(self.A_form)
 
+        self.g = fem.petsc.create_vector(self.b_form)
+        with self.g.localForm() as g_local:
+            g_local.set(0.0)
+        
+        self.x0 = fem.petsc.create_vector(self.b_form)
+        with self.x0.localForm() as x0_local:
+            x0_local.set(0.0)
+
         self.comm = domain.comm
         map_c = domain.topology.index_map(domain.topology.dim)
         self.num_owned_cells = map_c.size_local
@@ -373,9 +475,8 @@ class CustomSolver:
 
         self.kernel_A = get_kernel(dR)
         self.kernel_b = get_kernel(R)
-
-        self.N_coeffs_values_local_A, self.coeffs_values_global_A, self.coeffs_eval_A, self.coeffs_constants_A, self.constants_values_A = extract_coefficients_and_constants(dR)
-        self.N_coeffs_values_local_b, self.coeffs_values_global_b, self.coeffs_eval_b, self.coeffs_constants_b, self.constants_values_b = extract_coefficients_and_constants(R)
+        self.N_coeffs_values_local_A, self.coeffs_values_global_A, self.coeffs_eval_A, self.coeffs_constants_A, self.coeffs_dummy_values_A, self.constants_values_A = extract_data(dR)
+        self.N_coeffs_values_local_b, self.coeffs_values_global_b, self.coeffs_eval_b, self.coeffs_constants_b, self.coeffs_dummy_values_b, self.constants_values_b = extract_data(R)
 
         self.solver = self.solver_setup()
 
@@ -386,25 +487,38 @@ class CustomSolver:
         solver.setOperators(self.A)
         return solver
 
-    def assemble(self):
+    def assemble(self, scale: float, x0: np.ndarray):
         self.A.zeroEntries()
         with self.b.localForm() as b_local:
             b_local.set(0.0)
+                
+        fem.set_bc(self.g, self.bcs)
+        if x0 is not None:
+            fem.set_bc(self.x0, self.bcs, x0=self.g.array + x0, scale=-1.0)
 
         assemble_ufc(
             self.A.handle, self.b.array, self.u.x.array, self.geo_dofs, self.coordinates, self.dofmap_topological, self.num_owned_cells, self.N_dofs_element,
-            self.N_coeffs_values_local_A, self.coeffs_values_global_A, self.coeffs_eval_A, self.coeffs_constants_A, self.constants_values_A,
-            self.N_coeffs_values_local_b, self.coeffs_values_global_b, self.coeffs_eval_b, self.coeffs_constants_b, self.constants_values_b,
-            self.kernel_A, self.kernel_b
+            self.N_coeffs_values_local_A, self.coeffs_values_global_A, self.coeffs_eval_A, self.coeffs_constants_A, self.coeffs_dummy_values_A, self.constants_values_A,
+            self.N_coeffs_values_local_b, self.coeffs_values_global_b, self.coeffs_eval_b, self.coeffs_constants_b, self.coeffs_dummy_values_b, self.constants_values_b,
+            self.kernel_A, self.kernel_b,
+            self.g.array, scale, self.x0.array
         )
         self.A.assemble()
         self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
 
-        fem.apply_lifting(self.b, [self.A_form], bcs=[self.bcs], x0=[self.u.vector], scale=-1.0)
         self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-        fem.set_bc(self.b, self.bcs, self.u.vector, -1.0)
+        fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
+        # print(self.A[:,:],'\n')
+        # fem.apply_lifting(self.b, [self.A_form], bcs=[self.bcs], x0=[self.u.vector], scale=-1.0)
+        # self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        # fem.set_bc(self.b, self.bcs, self.u.vector, -1.0)
 
-    def solve(self, du):
-        self.assemble()
+    def solve(self, 
+              du: fem.function.Function, 
+              scale: float = 1.0,
+              x0: np.ndarray = None
+):
+        self.assemble(scale, x0)
+        # print(self.b[:])
         self.solver.setOperators(self.A)
         self.solver.solve(self.b, du.vector)
