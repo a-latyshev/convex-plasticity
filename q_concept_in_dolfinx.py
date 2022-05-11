@@ -176,7 +176,8 @@ print('u shape = ', u.x.array.shape)
 print('q shape = ', q_sigma.x.array.shape)
 print('dofs:', bc_dofs)
 
-print(f'dofmap = \n{dofmap}, \n dofmap_vec = \n{dofmap_tmp}')
+
+# print(f'dofmap = \n{dofmap}, \n dofmap_vec = \n{dofmap_tmp}')
 
 def check_solution(u, u_bc_value):
     """
@@ -233,6 +234,8 @@ f = df.io.XDMFFile(mesh.comm, "displacements.xdmf", "w")
 f.write_mesh(mesh)
 ts = np.linspace(0.0, 1.0, 5)
 u_bc_max = 42.0
+import time
+
 for t in ts:
     # update value of Dirichlet BC
     u_bc.value = t * u_bc_max
@@ -240,25 +243,31 @@ for t in ts:
     print0(f"Solving {t = :6.3f} with {u_bc.value = :6.3f}...")
 
     evaluate_constitutive_law(u)
-    q_sigma.x.array[:] = np.full_like(q_sigma.x.array[:], 1)
+    # q_sigma.x.array[:] = np.full_like(q_sigma.x.array[:], 1)
     # print('q', q_sigma.x.array[:].reshape(-1, 3))
 
 
     # update matrix (pointless in linear elasticity...)
     A.zeroEntries()
-    df.fem.petsc.assemble_matrix(A, dR, bcs=bcs)
-    A.assemble()
-
     # update residual vector
     with b.localForm() as b_local:
         b_local.set(0.0)
-    df.fem.petsc.assemble_vector(b, R)
-    print(b[:].reshape(-1, 3))
-    # print(b[:])
+    start = time.time()
 
-    # df.fem.apply_lifting(b, [dR], bcs=[bcs], x0=[u.vector], scale=-1.0)
+    df.fem.petsc.assemble_matrix(A, dR, bcs=bcs)
+    A.assemble()
+
+    df.fem.petsc.assemble_vector(b, R)
+    print(f'iter = {t}, time = {time.time() - start}')
+    
+    # print(b[:].reshape(-1, 3))
+
+    df.fem.apply_lifting(b, [dR], bcs=[bcs], x0=[u.vector], scale=-1.0)
     b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
     df.fem.set_bc(b, bcs, u.vector, -1.0)
+    # print(b.array[:])
+    # print(f'rank = {MPI.COMM_WORLD.rank}, real = \n{b.array[:]}')
+
 
     # print('\nb', b[:])
     # A_dense = A.convert("dense")
@@ -277,11 +286,14 @@ for t in ts:
     solver.solve(b, du.vector)
     u.x.array[:] -= du.x.array[:]
     u.x.scatter_forward()
-    # print('\nu', u.x.array[:])
+    print('\nu', u.x.array[:])
+    # print(f'rank = {MPI.COMM_WORLD.rank}, u = \n {u.x.array[:]}')
 
     # post processing
     # check_solution(u, t * u_bc_max)
     f.write_function(u, t)
+
+
 
 # for t in np.linspace(0.0, 1.0, 5):
     # update value of Dirichlet BC
