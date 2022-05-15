@@ -11,3 +11,7 @@ __pycache__/
 *.out
 *.pdf
 *.synctex.gz
+*.nav
+*.snm
+*.toc
+**/_minted**
