@@ -339,31 +339,10 @@ def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_elem
 
         b_local.fill(0.)
         A_local.fill(0.)
-        # coeffs_A.fill(0.)
 
         coeffs_b = local_assembling_b(cell, coeffs_values_global_b, coeffs_coeff_values_b, coeffs_dummy_values_b, coeffs_eval_b, u_local, coeffs_constants_b, geometry, entity_local_index, perm)
 
-        # sigma_local = coeffs_values_global_b[0][cell]
-        # p_local = coeffs_coeff_values_b[0][cell]
-        # dp_local = coeffs_coeff_values_b[1][cell]
-        # sigma_old_local = coeffs_coeff_values_b[2][cell]
-
-        # output_values = coeffs_eval_b[0](sigma_local, 
-        #                                  sigma_old_local,
-        #                                  p_local,
-        #                                  dp_local,
-        #                                  u_local, 
-        #                                  coeffs_constants_b[0], 
-        #                                  geometry, entity_local_index, perm)
-
-        # coeffs_b = sigma_local
-
-        # for i in range(len(coeffs_dummy_values_b)):
-        #     coeffs_dummy_values_b[i][:] = output_values[i] #C_tang update
-
         coeffs_A = local_assembling_A(coeffs_dummy_values_b)
-
-        # coeffs_A = coeffs_dummy_values_b[0]
 
         kernel_b(ffi.from_buffer(b_local), 
                  ffi.from_buffer(coeffs_b),
@@ -384,76 +363,62 @@ def assemble_ufc(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_elem
 @numba.njit(fastmath=True)
 def assemble_ufc_b(b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_element,
                  N_coeffs_values_local_b, coeffs_values_global_b, coeffs_eval_b, coeffs_constants_b, coeffs_dummy_values_b, coeffs_coeff_values_b, constants_values_b, local_assembling_b, 
-                 kernel_A, kernel_b, 
-                 g, scale, x0, 
+                 kernel_b):
+    entity_local_index = np.array([0], dtype=np.intc)
+    perm = np.array([0], dtype=np.uint8)
+    geometry = np.zeros((3, 3))
+
+    b_local = np.zeros(N_dofs_element, dtype=PETSc.ScalarType)
+
+    for cell in range(num_owned_cells):
+        pos = dofmap[cell]
+        geometry[:] = coords[geo_dofs[cell], :]
+        u_local = u[pos]
+
+        b_local.fill(0.)
+
+        coeffs_b = local_assembling_b(cell, coeffs_values_global_b, coeffs_coeff_values_b, coeffs_dummy_values_b, coeffs_eval_b, u_local, coeffs_constants_b, geometry, entity_local_index, perm)
+       
+        kernel_b(ffi.from_buffer(b_local), 
+                 ffi.from_buffer(coeffs_b),
+                 ffi.from_buffer(constants_values_b),
+                 ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
+        
+        b[pos] += b_local
+
+@numba.njit(fastmath=True)
+def assemble_ufc_A(A, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_element,
+                 N_coeffs_values_local_A, coeffs_values_global_A, coeffs_eval_A, coeffs_constants_A, coeffs_dummy_values_A, coeffs_coeff_values_A, constants_values_A, local_assembling_A, 
+                 N_coeffs_values_local_b, coeffs_values_global_b, coeffs_eval_b, coeffs_constants_b, coeffs_dummy_values_b, coeffs_coeff_values_b, constants_values_b, local_assembling_b, 
+                 kernel_A, 
                  mode=PETSc.InsertMode.ADD_VALUES):
     entity_local_index = np.array([0], dtype=np.intc)
     perm = np.array([0], dtype=np.uint8)
     geometry = np.zeros((3, 3))
 
-    # N_coeffs_b = N_coeffs_values_local_b.size
-    # N_coeffs_A = N_coeffs_values_local_A.size
-
-    # coeffs_A = np.zeros(1, dtype=PETSc.ScalarType) if N_coeffs_A == 0 else \
-    #            np.zeros(int(np.sum(N_coeffs_values_local_A)), dtype=PETSc.ScalarType)
-               
-    # coeffs_b = np.zeros(1, dtype=PETSc.ScalarType) if N_coeffs_b == 0 else \
-    #            np.zeros(int(np.sum(N_coeffs_values_local_b)), dtype=PETSc.ScalarType)
-
-    b_local = np.zeros(N_dofs_element, dtype=PETSc.ScalarType)
     A_local = np.zeros((N_dofs_element, N_dofs_element), dtype=PETSc.ScalarType)
 
     for cell in range(num_owned_cells):
         pos = rows = cols = dofmap[cell]
         geometry[:] = coords[geo_dofs[cell], :]
         u_local = u[pos]
-        x0_local = x0[pos]
-        g_local = g[pos]
 
-        b_local.fill(0.)
         A_local.fill(0.)
-        # coeffs_A.fill(0.)
-
+        
         coeffs_b = local_assembling_b(cell, coeffs_values_global_b, coeffs_coeff_values_b, coeffs_dummy_values_b, coeffs_eval_b, u_local, coeffs_constants_b, geometry, entity_local_index, perm)
 
-        # sigma_local = coeffs_values_global_b[0][cell]
-        # p_local = coeffs_coeff_values_b[0][cell]
-        # dp_local = coeffs_coeff_values_b[1][cell]
-        # sigma_old_local = coeffs_coeff_values_b[2][cell]
-
-        # output_values = coeffs_eval_b[0](sigma_local, 
-        #                                  sigma_old_local,
-        #                                  p_local,
-        #                                  dp_local,
-        #                                  u_local, 
-        #                                  coeffs_constants_b[0], 
-        #                                  geometry, entity_local_index, perm)
-
-        # coeffs_b = sigma_local
-
-        # for i in range(len(coeffs_dummy_values_b)):
-        #     coeffs_dummy_values_b[i][:] = output_values[i] #C_tang update
-
         coeffs_A = local_assembling_A(coeffs_dummy_values_b)
-
-        # coeffs_A = coeffs_dummy_values_b[0]
-
-        kernel_b(ffi.from_buffer(b_local), 
-                 ffi.from_buffer(coeffs_b),
-                 ffi.from_buffer(constants_values_b),
-                 ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
         
         kernel_A(ffi.from_buffer(A_local), 
                  ffi.from_buffer(coeffs_A),
                  ffi.from_buffer(constants_values_A),
                  ffi.from_buffer(geometry), ffi.from_buffer(entity_local_index), ffi.from_buffer(perm))
 
-        #Local apply lifting : b_local - scale * A_local_brut(g_local - x0_local)
-        b_local -= scale * A_local @ ( g_local - x0_local )
-        b[pos] += b_local
-
         MatSetValues_ctypes(A, N_dofs_element, rows.ctypes, N_dofs_element, cols.ctypes, A_local.ctypes, mode)
 
+# @numba.njit(fastmath=True)
+# def apply_lifting(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_element,
+    #              N_coeffs_values_local_A, coeffs_values_global_A, coeffs_eval_A, coeffs_constants_A, coeffs_dummy_values_A, coeffs_coeff_values_A, |
 
 def get_topological_dofmap(V:fem.function.FunctionSpace):
     """Makes a topological dofmap for a vector function space
@@ -540,12 +505,44 @@ class CustomSolver:
         solver.setOperators(self.A)
         return solver
 
-    def assemble(self, scale: float, x0: np.ndarray, b_additional: typing.Optional[PETSc.Vec] = None):
+    def assemble_matrix(self):
+        self.A.zeroEntries()
+        assemble_ufc_A(
+            self.A.handle, self.u.x.array, self.geo_dofs, self.coordinates, self.dofmap_topological, self.num_owned_cells, self.N_dofs_element,
+            self.N_coeffs_values_local_A, self.coeffs_values_global_A, self.coeffs_eval_A, self.coeffs_constants_A, self.coeffs_dummy_values_A, self.coeffs_coeff_values_A, self.constants_values_A, self.local_assembling_A,
+            self.N_coeffs_values_local_b, self.coeffs_values_global_b, self.coeffs_eval_b, self.coeffs_constants_b, self.coeffs_dummy_values_b, self.coeffs_coeff_values_b, self.constants_values_b, self.local_assembling_b,
+            self.kernel_A
+        )
+        self.A.assemble()
+        self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
+
+    def assemble_vector(self, b_additional: typing.Optional[PETSc.Vec] = None):
+        with self.b.localForm() as b_local:
+            b_local.set(0.0)
+        
+        assemble_ufc_b(
+            self.b.array, self.u.x.array, self.geo_dofs, self.coordinates, self.dofmap_topological, self.num_owned_cells, self.N_dofs_element,
+            self.N_coeffs_values_local_b, self.coeffs_values_global_b, self.coeffs_eval_b, self.coeffs_constants_b, self.coeffs_dummy_values_b, self.coeffs_coeff_values_b, self.constants_values_b, self.local_assembling_b,
+            self.kernel_b
+        )
+
+        if b_additional is not None:
+            self.b.axpy(1, b_additional)
+
+        # self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        # fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
+
+    def assemble(self, 
+                 scale: float = 1.0, 
+                 x0: typing.Optional[np.ndarray] = None, 
+                 b_additional: typing.Optional[PETSc.Vec] = None
+    ):
         self.A.zeroEntries()
         with self.b.localForm() as b_local:
             b_local.set(0.0)
                 
         fem.set_bc(self.g, self.bcs)
+        # self.x0 != x0, self.x0 is for applying lifting
         if x0 is not None:
             fem.set_bc(self.x0, self.bcs, x0=self.g.array + x0, scale=-1.0)
 
@@ -560,11 +557,11 @@ class CustomSolver:
         self.A.assemble()
         self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
 
-        self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-        fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
-
         if b_additional is not None:
             self.b.axpy(1, b_additional)
+
+        self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+
         fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
 
     def solve(self, 
@@ -572,7 +569,12 @@ class CustomSolver:
               scale: float = 1.0,
               x0: np.ndarray = None,
               b_additional: typing.Optional[PETSc.Vec] = None
-):
+    ):
         self.assemble(scale, x0, b_additional)
-        self.solver.setOperators(self.A)
+        # self.solver.setOperators(self.A)
+        self.solver.solve(self.b, du.vector)
+
+    def solve(self, 
+              du: fem.function.Function, 
+):
         self.solver.solve(self.b, du.vector)
