@@ -49,8 +49,6 @@ We introduce a new entity named as `CustomFunction` (or `CustomExpression`). It
 1. inherits `fem.Function`
 2. contains a method `eval`, which will be called inside of the assemble loop and calculates the function local values
 
-<!-- It can be implemented with the help of numba library and other  -->
-
 ## DummyFunction 
 
 Besides `CustomFunction` we need an other entity. Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. Let us consider the previous variational form, where $g$ contains its local-element values now. If there is one local value of $g$ (only 1 gauss point), $g$ will be  `fem.Constant`, but we need to store different values of $g$ in every element node (gauss point). So we introduce a concept of `DummyFunction` (or `ElementaryFunction`?), which 
@@ -110,9 +108,7 @@ def local_assembling_A(coeffs_dummy_values_b):
 The elasticity case is trivial and doesn't show clearly our demands by the described above features. Therefore we present here a standard non-linear problem from our scientific domain - a plasticity problem.
 
 The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). We focus on the following variational problem only
-$$ 
-    \int\limits_\Omega \left( \mathbf{C}^\text{tang} : \underline{\underline{\varepsilon}}(\underline{du})  \right) : \underline{\underline{\varepsilon}}(\underline{v}) dx + \int\limits_\Omega \underline{\underline{\sigma}}_n : \underline{\underline{\varepsilon}}(\underline{v}) dx - q\int\limits_{\partial\Omega_{\text{inside}}}  \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V,
-$$
+$$ \int\limits_\Omega \left( \mathbf{C}^\text{tang} : \underline{\underline{\varepsilon}}(\underline{du})  \right) : \underline{\underline{\varepsilon}}(\underline{v}) dx + \int\limits_\Omega \underline{\underline{\sigma}}_n : \underline{\underline{\varepsilon}}(\underline{v}) dx - q\int\limits_{\partial\Omega_{\text{inside}}}  \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
 where $\underline{\underline{\sigma}}_n$ is the stress tensor calculated on the previous loading step and the 4th rank tensor $\mathbf{C}^\text{tang}$ is defined as follows:
 $$
     \mathbf{C}^\text{tang} = \mathbf{C} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \underline{\underline{n}} \otimes \underline{\underline{n}} - 2\mu\beta \mathbf{DEV} 
