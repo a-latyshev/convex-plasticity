@@ -1,0 +1,13 @@
+\frametitle{Dirichlet conditions}
+\begin{pythoncode}
+    self.g = fem.petsc.create_vector(self.b_form)
+    self.x0 = fem.petsc.create_vector(self.b_form)
+    ...
+    if x0 is not None:
+      fem.set_bc(self.x0, self.bcs, x0=self.g.array + x0, scale=-1.0)
+    ...
+    g_local = g[pos]
+    x0_local = x0[pos]
+    ...
+    b_local -= scale * A_local @ ( g_local - x0_local )
+  \end{pythoncode}

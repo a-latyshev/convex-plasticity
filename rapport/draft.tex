@@ -1,0 +1,114 @@
+\documentclass[12pt]{article}
+
+% \usepackage[latin1]{inputenc}    
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel} 
+\usepackage[utf8]{inputenc} 
+\usepackage{amsmath, amssymb}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2cm, right=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{gensymb}
+\usepackage{hyperref}
+
+\usepackage{eurosym}
+
+\usepackage{setspace} \onehalfspacing % interline interval
+
+\newcommand\ul[1]{\underline{#1}}
+\newcommand\uusigma{\ul{\ul{\sigma}}}
+\newcommand\uus{\ul{\ul{s}}}
+\newcommand\uue{\ul{\ul{e}}}
+\newcommand\uuI{\ul{\ul{I}}}
+\newcommand\uuUnit{\ul{\ul{1}}}
+\newcommand\uueps{\ul{\ul{\varepsilon}}}
+
+\newcommand\Deltaepsp{\Delta \uueps_{n}^p}
+\newcommand\Deltaeps{\Delta \uueps_{n}}
+\newcommand\Deltaep{\Delta \uue_{n}^p}
+\newcommand\sigmaeqn{\sigma_{n+1}^\text{eq}}
+\newcommand\sigmaeqnelas{\sigma_{n+1}^\text{elas,eq}}
+\newcommand\uusn{\uus_{n+1}}
+\newcommand\uusnelas{\uus_{n+1}^\text{elas}}
+\newcommand\uusigman{\ul{\ul{\sigma}}_{n+1}}
+\newcommand\uusigmanelas{\uusigman^{\text{elas}}}
+
+\newcommand\mtr{\mathrm{tr}}
+
+
+\begin{document}
+
+\begin{titlepage}
+	% \thispagestyle{empty}
+	\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+	\center
+	% \textsc{\large ECOLE NATIONALE DES PONTS ET CHAUSSEES}\\[.7cm]
+	% \includegraphics[width=35mm]{../img/img/ENPC_logo.png}\\[.5cm]
+	% \textsc{École des Ponts ParisTech}\\[.5cm]
+    % \textsc{2020-2021}\\[0.5cm]
+    
+	\textsc{\large Rapport de stage PFE}\\[0.5cm]
+    \textsc{\large Andrey Latyshev}\\[0.5cm]    
+    \textsc{Élève ingénieur de double diplôme}\\[1.5cm]
+
+    % \textsc{\large Stage 1 : Modélisation numérique des joints poreux }\\
+	% \textsc{\large Stage 2 : Estimation de l'amortissement en roulis d'un corps flottant par méthode numérique (CFD) }\\[1.5cm]
+    % \textsc{\small Stage 1 réalisé au sein du Laboratoire Navier, CNRS}\\[0.1cm]
+    % \textsc{\small 6 et 8 avenue Blaise Pascal, Champs-sur-Marne, 77455 Marne la Vallée cedex 2}\\[0.1cm]
+    % \textsc{\small Dates du stage : 08/06/2020 - 11/09/2021}\\[1cm]
+
+    % \textsc{\small Stage 2 réalisé au sein de Doris Engineering}\\[0.1cm]
+    % \textsc{\small 58a Rue du Dessous des Berges, 75013, Paris}\\[0.1cm]
+    % \textsc{\small Dates du stage : 14/09/2020 - 14/02/2021}\\[1cm]
+
+	% \textsc{\large Maître de stage 1 : M. Patrick Dangla}\\[0.5cm]
+	% \textsc{\large Maître de stage 2 : M. Evgeny Andreev}\\[0.5cm]
+	\textsc{\huge DRAFT}
+
+\end{titlepage}
+
+\pagestyle{plain}
+
+\section{Critère de Drucker-Prager}
+
+\begin{equation}
+    f(\uusigma, p) = \sigma_{\text{eq}} + \alpha \mtr \uusigma - R(p) \leq 0
+\end{equation}
+
+\begin{equation}
+    \dot{\uueps}^p = \dot{\lambda} \frac{\partial f}{\partial \uusigma} = \dot{\lambda} \left(\frac{3}{2} \frac{\uus}{\sigma_\text{eq}} + \alpha \uuUnit \right)
+\end{equation}
+
+\begin{equation}
+    \dot{p} = \sqrt{\frac{2}{3} \dot{\uueps}^p : \dot{\uueps}^p} = \dot{\lambda}\sqrt{1 + 2\alpha}
+\end{equation}
+
+\begin{align}
+    & \sigmaeqn + \alpha \mtr \uusigman - R(p_n + \Delta p_n) = 0 \\
+    & \uus_{n+1} = \uus_{n+1}^\text{elas} - 2\mu\Delta\uue_n^p \\
+    & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaepsp - \kappa \mtr (\Deltaepsp) \uuUnit \\
+    & \Deltaepsp = \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right), \quad \Deltaep = \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \frac{3}{2} \frac{\uusn}{\sigmaeqn} \\
+    & \sigmaeqn = \sigmaeqnelas - \frac{3\mu}{\sqrt{1 + 2\alpha}}\Delta p_n \\
+    & \mtr \uusigman = \mtr \uusigmanelas - (2 \mu + 3\kappa) \mtr \Deltaepsp \\
+    & \mtr \Deltaepsp = \frac{3\alpha}{\sqrt{1 + 2\alpha}} \Delta p_n
+\end{align}
+
+\begin{align}
+    & R(p) = \sigma_0 + h p \\
+    & \sigmaeqnelas - \frac{3\mu}{\sqrt{1 + 2\alpha}}\Delta p_n + \alpha \mtr \uusigmanelas - (2 \mu + 3\kappa) \frac{3\alpha^2}{\sqrt{1 + 2\alpha}} \Delta p_n - \sigma_0 - h p_n - h \Delta p_n = 0 \\
+    & \Delta p_n = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \frac{3\mu + 3\alpha^2(2 \mu + 3\kappa)}{\sqrt{1 + 2\alpha}} + h} = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \gamma } \\
+    & \gamma = \frac{3\mu + 3\alpha^2(2 \mu + 3\kappa)}{\sqrt{1 + 2\alpha}} + h
+\end{align}
+
+\begin{align}
+    & \frac{\partial (\mtr (\Deltaepsp) \uuUnit)}{\partial \Deltaeps} = \frac{\partial \Deltaepsp}{\partial \Deltaeps} : \uuUnit \otimes  \uuUnit \\
+\end{align}
+
+\begin{align}
+    & \frac{\partial \Deltaepsp}{\partial \Deltaeps} = \frac{\partial}{\partial \Deltaeps} \left( \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right) \\
+    & \frac{\partial \uusnelas{}}{\partial \Deltaeps} = \\
+    & \frac{\partial \sigmaeqnelas{}}{\partial \Deltaeps} = 
+\end{align}
+
+\end{document}
