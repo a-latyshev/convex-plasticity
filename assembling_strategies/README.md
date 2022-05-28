@@ -107,34 +107,38 @@ def local_assembling_A(coeffs_dummy_values_b):
 
 The elasticity case is trivial and doesn't show clearly our demands by the described above features. Therefore we present here a standard non-linear problem from our scientific domain - a plasticity problem.
 
-The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). We focus on the following variational problem only
-$$ \int\limits_\Omega \left( \mathbf{C}^\text{tang}  $$
+The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). We focus on the following variational problem only 
+$$ \int\limits_\Omega \left( \mathbf{C}^\text{tang} : \underline{\underline{\varepsilon}}(\underline{du})  \right) : \underline{\underline{\varepsilon}}(\underline{v}) dx + \int\limits_\Omega \underline{\underline{\sigma_n}} : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
+
 where $\underline{\underline{\sigma}}_n$ is the stress tensor calculated on the previous loading step and the 4th rank tensor $\mathbf{C}^\text{tang}$ is defined as follows:
 $$ \mathbf{C}^\text{tang} = \mathbf{C} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \underline{\underline{n}} \otimes \underline{\underline{n}} - 2\mu\beta \mathbf{DEV} $$
 
 In contrast to the elasticity problem the 4th rank tensor here is a variable and has different values in every gauss point. At the same time we would like to avoid an allocation of tensor with that rank. Now it should be more evident to use the concept of `DummyFunction` for $\mathbf{C}^\text{tang}$.
 Other necessary expressions are presented below, but we won't get into details 
 
-$$ \underline{\underline{\sigma}}_\text{elas} = \underline{\underline{\sigma}}_n + \mathbf{C} : \Delta \underline{\underline{\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}, \quad \underline{\underline{s}} = \mathsf{dev} \underline{\underline{\sigma}}_\text{elas} $$
-$$
-    f_\text{elas} = \sigma^\text{eq}_\text{elas} - \sigma_0 - H p_n 
-$$  
-$$
-    \Delta p = \frac{<f_\text{elas}>_+}{3\mu + H}, \quad \beta = \frac{3\mu}{\sigma^\text{eq}_\text{elas}}\Delta p, \quad \underline{\underline{n}} = \frac{\underline{\underline{s}}}{\sigma^\text{eq}_\text{elas}} 
-$$
-$$
-    \underline{\underline{\sigma}}_{n+1} = \underline{\underline{\sigma}}_\text{elas} - \beta \underline{\underline{s}}
-$$
+$$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma_n}} + \mathbf{C} : \Delta \underline{\underline{\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}$$ 
+
+$$\underline{\underline{s}} = \mathsf{dev} \underline{\underline{\sigma_\text{elas}}} $$
+
+$$ f_\text{elas} = \sigma^\text{eq}_\text{elas} - \sigma_0 - H p_n $$  
+
+$$\Delta p = \frac{< f_\text{elas} >_+}{3\mu + H},$$
+
+$$\beta = \frac{3\mu}{\sigma^\text{eq}_\text{elas}}\Delta p$$
+
+$$\underline{\underline{n}} = \frac{\underline{\underline{s}}}{\sigma^\text{eq}_\text{elas}}$$
+
+$$\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_\text{elas}}} - \beta \underline{\underline{s}}$$
 
 $$
-    <f>_+ = 
+    < f>_+ = 
         \begin{cases}
             f, \quad f > 0, \\
             0, \quad \text{otherwise}
         \end{cases}
 $$
 
-We can conclude, that the fields $\underline{\underline{\sigma}}_{n+1} = \underline{\underline{\sigma}}_{n+1}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma}}_n)$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. So before, it would be necessary to allocate additional space for them and calculate $\underline{\underline{\sigma}}_{n+1}$ and $\mathbf{C}^\text{tang}$ separately. 
+We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. So before, it would be necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately. 
 
 In comparison with the elasticity case the `CustomFunction` `sig` has more dependent fields. Look at the code below
 ```python
