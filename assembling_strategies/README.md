@@ -105,7 +105,7 @@ def local_assembling_A(coeffs_dummy_values_b):
 
 ### Plasticity problem
 
-The elasticity case is trivial and doesn't show clearly our demands by the described above features. Therefore we present here a standard non-linear problem from our scientific domain - a plasticity problem.
+The elasticity case is trivial and doesn't show clearly our demands by the described above features. Therefore we present here a standard non-linear problem from our scientific domain - a plasticity one.
 
 The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). We focus on the following variational problem only 
 $$ \int\limits_\Omega \left( \mathbf{C}^\text{tang} : \underline{\underline{\varepsilon}}(\underline{du})  \right) : \underline{\underline{\varepsilon}}(\underline{v}) dx + \int\limits_\Omega \underline{\underline{\sigma_n}} : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
@@ -138,7 +138,7 @@ $$
         \end{cases}
 $$
 
-We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. So before, it would be necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately. 
+We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. So before, it would be necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
 
 In comparison with the elasticity case the `CustomFunction` `sig` has more dependent fields. Look at the code below
 ```python
@@ -201,3 +201,4 @@ Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\tex
 
 ## Summarize
 
+We developed our own custom assembler inventing two new entities, which allow us to economize memory usage and to deal with more complex mathematical problems, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
