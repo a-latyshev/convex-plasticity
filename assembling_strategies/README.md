@@ -7,27 +7,24 @@ We consider the following typical non-linear problem in our study:
 Find $\underline{u} \in V$, such that
 
 $$ F(u) = \int_\Omega \underline{\underline{\sigma}}(\underline{u}) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{f} \underline{v} dx = 0 \quad \forall v \in V,$$
-where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is not linear and cannot be defined via UFLx. Let us show you some examples
+where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFLx. Let us show you some examples
 
 - $\underline{\underline{\sigma}}(\underline{u}) = f(\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III})$,
-- $\underline{\underline{\sigma}}(\underline{u}) = \min\limits_\alpha g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
+- $\underline{\underline{\sigma}}(\underline{u}) = \operatorname{argmin}\limits_\alpha g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
 
-where $\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III}$ are eigen values of $\underline{\underline{\varepsilon}}$.
+where $\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III}$ are eigenvalues of $\underline{\underline{\varepsilon}}$ and $g$ some scalar function.
 
-Furthermore, $\underline{\underline{\sigma}}(\underline{u})$ can be depended on other scalar, vector or even tensor fields, which we would like to prevent from memory allocation. They shell to be calculated during the assembling procedure.
+As seen in the second example, $\underline{\underline{\sigma}}(\underline{u})$ can also implicitly depend on the value of other scalar, vector or even tensorial quantities, $\alpha$ here. The latter do not necessarily need to be represented in a finite-element function space. They shall just be computed during the assembling procedure when evaluating the expression $\underline{\underline{\sigma}}(\underline{u})$ pointwise.
 
-For example here
-- $\underline{\underline{\sigma}}(\underline{u}) = h(\underline{\underline{\varepsilon}}(\underline{u}), p, \beta, \underline{\underline{n}}, \dots)$,
+In addition, in order to use a standard Newton method to find the solution of $F(u)=0$, we also need to compute the derivative of $\underline{\underline{\sigma}}$ with respect to $u$. The latter may also depend on some internal variables $\alpha$ of $\underline{\underline{\sigma}}$. Thus, it is necessary to have a fonctionality which will allow to do a simultaneous calculation of $\underline{\underline{\sigma}}$ and its derivative during assembling procedure.
 
-we don't use internal variables $\beta$ and $\underline{\underline{n}}$ as global fields, so it would be a waste of memory if we allocated memory for their values.
-
-In addition, as we use a standard Newton method to find the solution, we need to calculate the derivative of $\underline{\underline{\sigma}}$ also. In our cases it's the forth rank tensor, which values depend on some internal variables of $\underline{\underline{\sigma}}$. Thus, it's necessary to have a fonctionality which will allow to do coupled calculations of $\underline{\underline{\sigma}}$ and its derivative during assembling procedure.
+In practice, in the previous examples $\underline{\underline{\sigma}}$ depends directly on $\underline{\underline{\varepsilon}} = \frac{1}{2}(\nabla u + \nabla u^T)$. As a result, it is more natural to consider the non-linear expression as a function of $\underline{\underline{\varepsilon}}$ directly, provide an expression for $\dfrac{d\underline{\underline{\sigma}}}{d\underline{\underline{\varepsilon}}}$ and evaluate $\dfrac{d\underline{\underline{\sigma}}}{du}$ by the chain rule (letting UFLx handle the $\dfrac{d\underline{\underline{\varepsilon}}}{du}$ part).
 
 As the result we require the following features:
 
-1. To express functions of variational problem in more complex way than it's allowed by UFLx
-2. To not allocate the memory for unnecessary fields 
-3. To couple calculations of different parts of variational problem during assembling
+1. To define nonlinear expressions of variational problems in more complex way than it's allowed by UFLx
+2. To let an "oracle" provide values of such an expression and its derivative(s)
+3. To call this oracle on-the-fly during the assembly to avoid unnecessary loops, precomputations and memory allocations
 
 The following text describes our own view of these features implementation.
 
@@ -39,7 +36,7 @@ Following the concept of the [custom assembler](https://github.com/FEniCS/dolfin
 
 ## CustomFunction 
 
-We would like to introduce a concept of `CustomFunction`, which is essential for our study. Let us consider the next simple variational problem 
+We would like to introduce a concept of `CustomFunction` (for lack of a better name), which is essential for our study. Let us consider the next simple variational problem 
 
 $$ \int_\Omega g \cdot uv dx, \quad \forall v \in V, $$
 
@@ -62,21 +59,33 @@ We implemented elasticity and plasticity problems to explain our ideas by exampl
 
 ### Elasticity problem
 
-Let's consider a beam stretching with the left side fixed. On the other side we apply displacements. 
+Let's consider a beam stretching with the left side fixed. On the other side we apply displacements. Find $u\in V$ s.t.
 
-$$\int_\Omega (\mathbf{C}:\underline{\underline{\varepsilon}}(\underline{du})) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{\underline{\sigma}}^n : \underline{\underline{\varepsilon}}(\underline{v}) dx = 0 \quad \forall v \in V,$$
+$$\int_\Omega \underline{\underline{\sigma}}(\underline{\underline{\varepsilon}}(\underline{u})) : \underline{\underline{\varepsilon}}(\underline{v}) dx  = 0 \quad \forall v \in V,$$
 
 $$ \partial\Omega_\text{left} : u_x = 0, $$
 $$ (0, 0) : u_y = 0, $$
 $$ \partial\Omega_\text{right} : u_x = t \cdot u_\text{bc},$$
-where $u_\text{bc}$ is a maximal displacement on the right side of the beam, $t$ is a parameter varying from 0 to 1, $\underline{\underline{\sigma}}^n$ is equal to a stress on a previous loading step and $\mathbf{C}$ is the 4th rank stiffness tensor.
+where $u_\text{bc}$ is a maximal displacement on the right side of the beam, $t$ is a parameter varying from 0 to 1, and where $\underline{\underline{\sigma}}(\underline{\underline{\varepsilon}})$ is our user-defined "oracle". Here we use a simple elastic behaviour:
 
-Let's focus on the key points. In this "naif" example the tensor $\mathbf{C}$ is constant, but it's often a variable in a majority of non-linear models. We would like to change it on every assembling step. In our therms it is a `DummyFunction`. Obviosly $\sigma^n$ serves as `CustomFunction`, which depends on $\mathbf{C}$ and we should take it into account. 
+$$
+\underline{\underline{\sigma}}(\underline{\underline{\varepsilon}}) = \mathbf{C}:\underline{\underline{\varepsilon}}
+$$
+
+and for which the derivative is:
+
+$$
+\dfrac{d\underline{\underline{\sigma}}}{d\underline{\underline{\varepsilon}}} = \mathbf{C}
+$$
+
+where $\mathbf{C}$ is the stiffness matrix.
+
+Let's focus on the key points. In this "naive" example the derivative is constant, but in general non-linear models, it's value will directly depend on the local value of $\underline{\underline{\varepsilon}}$. We would like to change this value at every assembling step. In our terms, it is a `DummyFunction`. Obviously, $\underline{\underline{\sigma}}$ is the `CustomFunction`, which depends on $\underline{\underline{\varepsilon}}$. 
 ```python
 q_dsigma = ca.DummyFunction(VQT, name='stiffness') # tensor C
 q_sigma = ca.CustomFunction(VQV, eps(u), [q_dsigma], get_eval)  # sigma^n
 ```
-In the `CustomFunction` constructor we observe three arguments. The first one is a ufl-expression of a basic function participating in the `q_sigma` expression. It will be compiled via ffcx and will be sent as "tabulated" expression to a numba function, which performs the calculation of `q_sigma`. The second argument is a list of `q_sigma` coefficients (`fem.Function` or `DummyFunction`), which take a part in calculations of `q_sigma`. The third argument contains a function generating a `CustomFunction` method `eval`, which will be called during the assembling. It describes every step of local calculation of $\sigma^n$.
+In the `CustomFunction` constructor we observe three arguments. The first one is the UFL-expression of its variable $\underline{\underline{\varepsilon}} here. It will be compiled via ffcx and will be sent as "tabulated" expression to a numba function, which performs the calculation of `q_sigma`. The second argument is a list of `q_sigma` coefficients (`fem.Function` or `DummyFunction`), which take a part in calculations of `q_sigma`. The third argument contains a function generating a `CustomFunction` method `eval`, which will be called during the assembling. It describes every step of local calculation of $\sigma$.
 
 Besides the local implementation of new entities we need to change the assembling procedure loop to describe explicitly the interaction between different coefficients of linear and bilinear forms. It allows us to write a quite general custom assembler, which will work for any kind non-linear problem. Thus we have to define two additional numba functions to calculate local values of forms kernels coefficients (see the code below).
 
@@ -107,16 +116,15 @@ def local_assembling_A(coeffs_dummy_values_b):
 
 The elasticity case is trivial and doesn't show clearly our demands by the described above features. Therefore we present here a standard non-linear problem from our scientific domain - a plasticity one.
 
-The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). We focus on the following variational problem only 
-$$ \int\limits_\Omega \left( \mathbf{C}^\text{tang} : \underline{\underline{\varepsilon}}(\underline{du})  \right) : \underline{\underline{\varepsilon}}(\underline{v}) dx + \int\limits_\Omega \underline{\underline{\sigma_n}} : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
+The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). Note that for this very specific example, everything can still be expressed in UFL directly. However, in general, this is no longer the case, as one may have to solve a nonlinear equation at each integration point to obtain the expression of stresses and plasticity variables.
 
-where $\underline{\underline{\sigma}}_n$ is the stress tensor calculated on the previous loading step and the 4th rank tensor $\mathbf{C}^\text{tang}$ is defined as follows:
-$$ \mathbf{C}^\text{tang} = \mathbf{C} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \underline{\underline{n}} \otimes \underline{\underline{n}} - 2\mu\beta \mathbf{DEV} $$
+We focus on the following variational problem only: Find $\Delta u \in V$ s.t.
 
-In contrast to the elasticity problem the 4th rank tensor here is a variable and has different values in every gauss point. At the same time we would like to avoid an allocation of tensor with that rank. Now it should be more evident to use the concept of `DummyFunction` for $\mathbf{C}^\text{tang}$.
-Other necessary expressions are presented below, but we won't get into details 
+$$ \int\limits_\Omega \underline{\underline{\sigma_{n+1}}} (\underline{\underline{\varepsilon}}(\Delta\underline{u})) : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
 
-$$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma_n}} + \mathbf{C} : \Delta \underline{\underline{\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}$$ 
+where $\Delta u$ is a displacement increment between two load steps, $\underline{\underline{\sigma}}_{n+1}$ is the current stress tensor which depends on the previous stress $\underline{\underline{\sigma}}_n$ and the previous plastic strain $p_n$ and which is implicitly defined as the solution to the following equations:
+
+$$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma}}_n + \mathbf{C} : \Delta \underline{\underline{\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}$$ 
 
 $$\underline{\underline{s}} = \mathsf{dev} \underline{\underline{\sigma_\text{elas}}} $$
 
@@ -128,7 +136,7 @@ $$\beta = \frac{3\mu}{\sigma^\text{eq}_\text{elas}}\Delta p$$
 
 $$\underline{\underline{n}} = \frac{\underline{\underline{s}}}{\sigma^\text{eq}_\text{elas}}$$
 
-$$\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_\text{elas}}} - \beta \underline{\underline{s}}$$
+$$\underline{\underline{\sigma}}_{n+1} = \underline{\underline{\sigma_\text{elas}}} - \beta \underline{\underline{s}}$$
 
 $$
     < f>_+ = 
@@ -138,7 +146,15 @@ $$
         \end{cases}
 $$
 
-We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. So before, it would be necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
+where $\Delta\underline{\underline{\varepsilon}} = \underline{\underline{\varepsilon}}(\Delta u)$ is the total strain increment.
+
+The corresponding derivative of the non-linear expression $\underline{\underline{\sigma}}_{n+1}(\Delta\underline{\underline{\varepsilon}})$ is given by:
+
+$$\dfrac{d\underline{\underline{\sigma}}_{n+1}}{d\Delta\underline{\underline{\varepsilon}}} = \mathbf{C}^\text{tang}(\Delta\underline{\underline{\varepsilon}}) = \mathbf{C} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \underline{\underline{n}} \otimes \underline{\underline{n}} - 2\mu\beta \mathbf{DEV} $$
+
+In contrast to the elasticity problem the tangent stiffness depends here on $\Delta\underline{\underline{\varepsilon}}$ and has different values in every gauss point. Since it's value is needed only for computing the global jacobian matrix, we would like to avoid an allocation of such a global tensorial field. This justifies to use the concept of `DummyFunction` for $\mathbf{C}^\text{tang}$.
+
+We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. With the legacy implementation, it was necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
 
 In comparison with the elasticity case the `CustomFunction` `sig` has more dependent fields. Look at the code below
 ```python
@@ -201,7 +217,7 @@ Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\tex
 
 ## Summarize
 
-We developed our own custom assembler inventing two new entities, which allow us to economize memory usage and to deal with more complex mathematical problems, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
+We developed our own custom assembler which makes use of two new entities. This allow us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
 
 ## Time test
 
