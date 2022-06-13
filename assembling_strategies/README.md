@@ -80,7 +80,7 @@ $$
 
 where $\mathbf{C}$ is the stiffness matrix.
 
-Let's focus on the key points. In this "naive" example the derivative is constant, but in general non-linear models, it's value will directly depend on the local value of $$\underline{\underline{\varepsilon}}$$. We would like to change this value at every assembling step. In our terms, it is a `DummyFunction`. Obviously, $\underline{\underline{\sigma}}$ is the `CustomFunction`, which depends on $\underline{\underline{\varepsilon}}$. 
+Let's focus on the key points. In this "naive" example the derivative is constant, but in general non-linear models, it's value will directly depend on the local value of $\underline{\underline{\varepsilon}}$. We would like to change this value at every assembling step. In our terms, it is a `DummyFunction`. Obviously, $\underline{\underline{\sigma}}$ is the `CustomFunction`, which depends on $\underline{\underline{\varepsilon}}$. 
 ```python
 q_dsigma = ca.DummyFunction(VQT, name='stiffness') # tensor C
 q_sigma = ca.CustomFunction(VQV, eps(u), [q_dsigma], get_eval)  # sigma^n
@@ -118,16 +118,13 @@ The elasticity case is trivial and doesn't show clearly our demands by the descr
 
 The full description of the problem and its implementation on a legacy version of Fenics is introduced [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html). Note that for this very specific example, everything can still be expressed in UFL directly. However, in general, this is no longer the case, as one may have to solve a nonlinear equation at each integration point to obtain the expression of stresses and plasticity variables.
 
-We focus on the following variational problem only 
-$$ \int\limits_\Omega \left( \mathbf{C}^\text{tang} : \underline{\underline{\varepsilon}}(\underline{du})  \right) : \underline{\underline{\varepsilon}}(\underline{v}) dx + \int\limits_\Omega \underline{\underline{\sigma_n}} : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
+We focus on the following variational problem only: Find $\Delta u \in V$ s.t.
 
-where $\underline{\underline{\sigma}}_n$ is the stress tensor calculated on the previous loading step and the 4th rank tensor $\mathbf{C}^\text{tang}$ is defined as follows:
-$$ \mathbf{C}^\text{tang} = \mathbf{C} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \underline{\underline{n}} \otimes \underline{\underline{n}} - 2\mu\beta \mathbf{DEV} $$
+$$ \int\limits_\Omega \underline{\underline{\sigma_{n+1}}} (\underline{\underline{\varepsilon}}(\Delta\underline{u})) : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
 
-In contrast to the elasticity problem the 4th rank tensor here is a variable and has different values in every gauss point. At the same time we would like to avoid an allocation of tensor with that rank. Now it should be more evident to use the concept of `DummyFunction` for $\mathbf{C}^\text{tang}$.
-Other necessary expressions are presented below, but we won't get into details 
+where $\Delta u$ is a displacement increment between two load steps, $\underline{\underline{\sigma}}_{n+1}$ is the current stress tensor which depends on the previous stress $\underline{\underline{\sigma}}_n$ and the previous plastic strain $p_n$ and which is implicitly defined as the solution to the following equations:
 
-$$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma_n}} + \mathbf{C} : \Delta \underline{\underline{\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}$$ 
+$$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma}}_n + \mathbf{C} : \Delta \underline{\underline{\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}$$ 
 
 $$\underline{\underline{s}} = \mathsf{dev} \underline{\underline{\sigma_\text{elas}}} $$
 
@@ -139,7 +136,7 @@ $$\beta = \frac{3\mu}{\sigma^\text{eq}_\text{elas}}\Delta p$$
 
 $$\underline{\underline{n}} = \frac{\underline{\underline{s}}}{\sigma^\text{eq}_\text{elas}}$$
 
-$$\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_\text{elas}}} - \beta \underline{\underline{s}}$$
+$$\underline{\underline{\sigma}}_{n+1} = \underline{\underline{\sigma_\text{elas}}} - \beta \underline{\underline{s}}$$
 
 $$
     < f>_+ = 
@@ -149,7 +146,15 @@ $$
         \end{cases}
 $$
 
-We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. So before, it would be necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
+where $\Delta\underline{\underline{\varepsilon}} = \underline{\underline{\varepsilon}}(\Delta u)$ is the total strain increment.
+
+The corresponding derivative of the non-linear expression $\underline{\underline{\sigma}}_{n+1}(\Delta\underline{\underline{\varepsilon}})$ is given by:
+
+$$\dfrac{d\underline{\underline{\sigma}}_{n+1}}{d\Delta\underline{\underline{\varepsilon}}} = \mathbf{C}^\text{tang}(\Delta\underline{\underline{\varepsilon}}) = \mathbf{C} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \underline{\underline{n}} \otimes \underline{\underline{n}} - 2\mu\beta \mathbf{DEV} $$
+
+In contrast to the elasticity problem the tangent stiffness depends here on $\Delta\underline{\underline{\varepsilon}}$ and has different values in every gauss point. Since it's value is needed only for computing the global jacobian matrix, we would like to avoid an allocation of such a global tensorial field. This justifies to use the concept of `DummyFunction` for $\mathbf{C}^\text{tang}$.
+
+We can conclude, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\Delta \underline{\underline{\varepsilon}}, \beta, \underline{\underline{n}}, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \underline{\underline{n}})$ depend on the common variables $\beta$ and $\underline{\underline{n}}$. With the legacy implementation, it was necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
 
 In comparison with the elasticity case the `CustomFunction` `sig` has more dependent fields. Look at the code below
 ```python
@@ -212,4 +217,4 @@ Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\tex
 
 ## Summarize
 
-We developed our own custom assembler inventing two new entities, which allow us to economize memory usage and to deal with more complex mathematical problems, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
+We developed our own custom assembler which makes use of two new entities. This allow us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
