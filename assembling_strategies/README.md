@@ -85,7 +85,7 @@ Let's focus on the key points. In this "naive" example the derivative is constan
 q_dsigma = ca.DummyFunction(VQT, name='stiffness') # tensor C
 q_sigma = ca.CustomFunction(VQV, eps(u), [q_dsigma], get_eval)  # sigma^n
 ```
-In the `CustomFunction` constructor we observe three arguments. The first one is the UFL-expression of its variable $\underline{\underline{\varepsilon}} here. It will be compiled via ffcx and will be sent as "tabulated" expression to a numba function, which performs the calculation of `q_sigma`. The second argument is a list of `q_sigma` coefficients (`fem.Function` or `DummyFunction`), which take a part in calculations of `q_sigma`. The third argument contains a function generating a `CustomFunction` method `eval`, which will be called during the assembling. It describes every step of local calculation of $\sigma$.
+In the `CustomFunction` constructor we observe three arguments. The first one is the UFL-expression of its variable $\underline{\underline{\varepsilon}}$ here. It will be compiled via ffcx and will be sent as "tabulated" expression to a numba function, which performs the calculation of `q_sigma`. The second argument is a list of `q_sigma` coefficients (`fem.Function` or `DummyFunction`), which take a part in calculations of `q_sigma`. The third argument contains a function generating a `CustomFunction` method `eval`, which will be called during the assembling. It describes every step of local calculation of $\sigma$.
 
 Besides the local implementation of new entities we need to change the assembling procedure loop to describe explicitly the interaction between different coefficients of linear and bilinear forms. It allows us to write a quite general custom assembler, which will work for any kind non-linear problem. Thus we have to define two additional numba functions to calculate local values of forms kernels coefficients (see the code below).
 
@@ -217,12 +217,16 @@ Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\tex
 
 ## Summarize
 
-We developed our own custom assembler which makes use of two new entities. This allow us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
+We developed our own custom assembler which makes use of two new entities. This allows us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
 
-## Time test
+## Miscellaneous
+
+Here you find the table, which contains the time needed to resolve the problem and the approriate JIT overhead.
 
 | Mesh | Time (s) | Elements nb. | Nodes nb. | JIT overhead (s)|
 | :---: | :---: | :----: | :---: | :---: |
 | Sparsed | 2.7 | 1478 | 811 | 7.5 |
 | Medium | 14 | 5716 | 3000 | 7.8 |
 | Dense | 100 | 25897 | 13251 | 4.9 |
+
+We can conclude from this table, that the time spent on the JIT compilation operations is quite negligible, if we consider dense meshes.
