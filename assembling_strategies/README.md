@@ -218,3 +218,11 @@ Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\tex
 ## Summarize
 
 We developed our own custom assembler which makes use of two new entities. This allow us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
+
+## Time test
+
+| Mesh | Time (s) | Elements nb. | Nodes nb. | JIT overhead (s)|
+| :---: | :---: | :----: | :---: | :---: |
+| Sparsed | 2.7 | 1478 | 811 | 7.5 |
+| Medium | 14 | 5716 | 3000 | 7.8 |
+| Dense | 100 | 25897 | 13251 | 4.9 |
