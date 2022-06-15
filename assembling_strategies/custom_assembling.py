@@ -89,13 +89,15 @@ def get_kernel(form:ufl.form.Form):
             
             The 2nd argument (`coeff_local`) takes an array of local values of all coefficients presenting in the form.
             
-            The 3rd argument (`constants_local`) takes an array of contants values being used in the form
+            The 3rd argument (`constants_local`) takes an array of constants values being used in the form
             
             The 4th argument (`geometry`) takes a 3*3 array of cell nodes coordinates.
             
             The 5th argument (`entity_local_index`) takes an array of entity_local_index.
             
             The 6th argument (`permutation`) is an elements permutation option.
+
+    Note: The form can have several integrals, but here we suppose that there is an only one.
     """
     domain = form.ufl_domain().ufl_cargo()
     ufcx_form, _, _ = ffcx_jit(domain.comm, form, form_compiler_params={"scalar_type": "double"})
@@ -111,23 +113,44 @@ c_signature = numba.types.void(
     numba.types.CPointer(numba.types.uint8))
 
 def get_dummy_x(V: fem.FunctionSpace) -> la.vector:
+    """Creates a vector with the size of two elements mesh.
+
+    Args:
+        V: A functional space.
+    Returns:
+        A `VectorMetaClass` object defined on a square mesh with two elements.
+    """
     dummy_domain = mesh.create_unit_square(MPI.COMM_WORLD, 1, 1)
     dummy_V = fem.FunctionSpace(dummy_domain, V._ufl_element)
     return la.vector(dummy_V.dofmap.index_map, dummy_V.dofmap.index_map_bs)
 
 class DummyFunction(fem.Function): #or ConstantFunction or BasicFunction ?
+    """Expands the class `fem.Function` to allocate its values only on one element.
+
+    Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. We need an entity, which contains only local
+    We find the `fem.Function` constructor argument `x` very useful here. We can set the `fem.Function` global vector to a vector of another `fem.Function` object defined on a 
+    
+    Attribues: 
+        values: A vector containing local values on only finite element.
+        shape: A shape of the tensor of the function mathematical representation.  
+    """
     def __init__(self, V: fem.FunctionSpace, name: typing.Optional[str] = None):
+        """Inits DummyFunction class."""
         super().__init__(V=V, x=get_dummy_x(V), name=name)
         self.value = self.x.array.reshape((2, -1))[0]
         self.shape = V._ufl_element.reference_value_shape()
     
     def fill(self, value: np.ndarray):
+        """Sets the function values
+        Args:
+            value: A numpy array containing values to be set 
+        """
         self.value[:] = value
 
 class CustomFunction(fem.Function):
-    """Expands the standard fem.Function
+    """Expands the class `fem.Function` and associates an appropriate mathematical expression.
 
-    On the current dolfinx version 0.3.1.0 we use `fem.Function` variable for `g` function defined as follows:  
+    On a current dolfinx version we use `fem.Function` variable for `g` function defined as follows:  
     .. math:: \\int g \\dot a(u,v) dx \\text{or} \\int g v dx 
     From here we don't know an exact expression of `g`, which we need to create separately. 
     `CustomFunction` class contains this information and can be used to assemble `g` locally using `custom_assembling`.
@@ -157,7 +180,7 @@ class CustomFunction(fem.Function):
             The 6th argument (`permutation`) is an elements permutation option.           
     """
     def __init__(self, V: fem.FunctionSpace, input_ufl_expression, coefficients, get_eval):
-        """Inits `CustomFunction`"""
+        """Inits `CustomFunction`."""
         
         super().__init__(V)
         self.local_dim = V.element.space_dimension
@@ -185,7 +208,7 @@ class CustomFunction(fem.Function):
 
     
     def set_values(self, cell, values):
-        """Sets values on an element #`cell`
+        """Sets values on an element #`cell`.
         
         Args:
             cell:
@@ -197,7 +220,7 @@ class CustomFunction(fem.Function):
         self.global_values[cell][:] = values
 
     def add_coefficient(self, coeff: typing.Union[DummyFunction, fem.Function], coeff_name:typing.Optional[str] = None):
-        """Adds and sorts coefficient of a `CustomFunction` 
+        """Adds and sorts coefficient of a `CustomFunction`.
             
         It sends the coefficient to `dummies` or `coefficients` according to its type. It creates an attribute of `CustomFunction` under a name of the `coeff` variable or string `coeff_name`.
          
@@ -223,16 +246,16 @@ class CustomFunction(fem.Function):
 
 @numba.cfunc(c_signature, nopython=True)
 def dummy_tabulated(b_, w_, c_, coords_, local_index, orientation):
-    """Simulates a typical tabulated function with appropriate signature"""
+    """Simulates a typical tabulated function with appropriate signature."""
     pass
 
 @numba.njit
 def dummy_eval(values, coeffs_values, constants_values, coordinates, local_index, orientation):
-    """Does nothing. To be used for empty lists, which are sent to a numba function as its argument"""
+    """Does nothing. To be used for empty lists, which are sent to a numba function as its argument."""
     pass
 
 def extract_constants(ufl_expression) -> np.ndarray:
-    """Extracts and puts together all values of all `fem.function.Constant` presenting in `ufl_expression`
+    """Extracts and puts together all values of all `fem.function.Constant` presenting in `ufl_expression`.
 
     Returns:
         constants_values: a numpy flatten array with values of all constants. Values are sorted in accordance with the order of constants in `ufl_expression`. 
@@ -242,7 +265,7 @@ def extract_constants(ufl_expression) -> np.ndarray:
     return constants_values
 
 def extract_data(form: ufl.form.Form) -> typing.Union[np.ndarray, list, list, np.ndarray]:
-    """Extracts coefficients and constants of a given form and puts their values all together 
+    """Extracts coefficients and constants of a given form and puts their values all together. 
 
     Args:
         form: linear or bilinear form
@@ -474,7 +497,7 @@ def assemble_ufc_b(b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_eleme
             a flatten numpy array containing all values of constants of an appropriate form (A or b, bilinear or linear)
     
         local_assembling_b:
-            a numba function making some particular calculations inside the assembling loop for  a linear form 
+            a numba function making some particular calculations inside the assembling loop for a linear form 
     
         kernel_b:
             a c-function representation of the linear form   
@@ -509,7 +532,7 @@ def assemble_ufc_A(A, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_eleme
                    coeffs_global_values_b, coeffs_eval_list_b, coeffs_constants_values_b, coeffs_dummies_values_b, coeffs_subcoeffs_values_b, constants_values_b, local_assembling_b, 
                    kernel_A, 
                    mode=PETSc.InsertMode.ADD_VALUES):
-    """Assembles the matrix A using FFCx/UFC approach 
+    """Assembles the matrix A using FFCx/UFC approach
     
     As it is a numba-function only numpy arrays, c-functions and other trivial objects and methods are allowed.
 
@@ -560,7 +583,7 @@ def assemble_ufc_A(A, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_eleme
             a numba function making some particular calculations inside the assembling loop for an appropriate form (A or b, bilinear or linear)
     
         kernel_A, kernel_b:
-            c-function representation of the bilinear and linear forms respectively 
+            c-function representations of the bilinear and linear forms respectively 
     
         mode:
             a mode of matrix assembling      
@@ -617,16 +640,44 @@ def get_topological_dofmap(V:fem.function.FunctionSpace):
     
     return dofmap_topological
 
-class CustomSolver:
+class CustomProblem:
+    """Class for solving a variational problem via custom assembling approach.
+
+    Attributes:
+        u: A vector containing global values of a solution
+        bcs: A list of Dirichlet boundary conditions 
+        bcs_dofs: A flatten numpy array containing Dirichlet boundary conditions indexes
+        dR: A ufl-expression of a bilinear form
+        R: A ufl-expression of a linear form
+        A_form: A fem form of a bilinear form
+        b_form: A fem form of a linear form
+        b: A vector containing global rhs vector of the linear system
+        A: A vector containing global matrix of the linear system 
+        local_assembling_A: A numba function making some particular calculations inside the assembling loop for bilinear form coefficients
+        local_assembling_b: a numba function making some particular calculations inside the assembling loop for linear form coefficients
+        g: A vector equal to the inhomogeneous Dirichlet BC at dofs with this BC, and zero elsewhere
+        x0:
+        comm:
+        num_owned_cells: 
+        geo_dofs: 
+        coordinates: 
+        dofmap_topological:
+        kernel_A, kernel_b:
+        ....
+
+        solver:
+    """
 
     def __init__(self, 
                 dR: ufl.Form,
                 R: ufl.Form,
                 u: fem.Function,
-                local_assembling_A,
-                local_assembling_b,
+                local_assembling_A: numba.core.registry.CPUDispatcher,
+                local_assembling_b: numba.core.registry.CPUDispatcher,
                 bcs: typing.List[fem.dirichletbc] = [],
-):
+    ):
+        """Inits CustomProblem."""
+
         self.u = u
         self.bcs = bcs
         self.bcs_dofs = np.concatenate([bc.dof_indices()[0] for bc in bcs]) if len(bcs) != 0 else np.array([], dtype=PETSc.IntType)
@@ -634,9 +685,8 @@ class CustomSolver:
         V = u.function_space
         domain = V.mesh
 
-        self.dR = dR
         self.R = R
-        
+        self.dR = dR
         self.b_form = fem.form(R)
         self.A_form = fem.form(dR)
         self.b = fem.petsc.create_vector(self.b_form)
@@ -672,6 +722,8 @@ class CustomSolver:
         self.solver = self.solver_setup()
 
     def data_extraction(self):
+        """Extracts coefficients and constants values and a list of `eval` CustomFunction functions of bilinear and linear forms."""
+
         self.coeffs_global_values_A, self.coeffs_eval_list_A, self.coeffs_constants_values_A, self.coeffs_dummies_values_A, self.coeffs_subcoeffs_values_A, self.constants_values_A = extract_data(self.dR)
 
         # self.coeffs_global_values_A, self.coeffs_eval_list_A, self.coeffs_constants_values_A, self.coeffs_dummies_values_A, self.coeffs_subcoeffs_values_A, self.constants_values_A = extract_data(self.dR)
@@ -680,6 +732,7 @@ class CustomSolver:
         # self.coeffs_global_values_b, self.coeffs_eval_list_b, self.coeffs_constants_values_b, self.coeffs_dummies_values_b, self.coeffs_subcoeffs_values_b, self.constants_values_b = extract_data(self.R)
 
     def solver_setup(self):
+        """Sets the solver parameters."""
         solver = PETSc.KSP().create(self.comm)
         solver.setType("preonly")
         solver.getPC().setType("lu")
@@ -687,6 +740,7 @@ class CustomSolver:
         return solver
 
     def assemble_matrix(self):
+        """Assembles the matrix A and applies Dirichlet boundary conditions."""
         self.A.zeroEntries()
         assemble_ufc_A(
             self.A.handle, self.u.x.array, self.geo_dofs, self.coordinates, self.dofmap_topological, self.num_owned_cells, self.N_dofs_element,
@@ -698,6 +752,11 @@ class CustomSolver:
         self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
 
     def assemble_vector(self, b_additional: typing.Optional[PETSc.Vec] = None):
+        """Assembles the vector b and adds optionally a global vector `b_additional` to it.
+        
+        Args:
+            b_additional: An optional global vector to be added to the vector b. It can be used for applying of Neuman boundary conditions.
+        """
         with self.b.localForm() as b_local:
             b_local.set(0.0)
         
@@ -719,6 +778,19 @@ class CustomSolver:
                  x0: typing.Optional[np.ndarray] = None, 
                  b_additional: typing.Optional[PETSc.Vec] = None
     ):
+        """Assembles the hole system and sets up all boundary conditions.
+        
+        It applies the lifting locally to take into account inhomogeneous Dirichlet boundary conditions as follows:
+        
+        .. math:: b - scale  A  (g - x0),
+
+        where g is a vector equal to the inhomogeneous Dirichlet BC at dofs with this BC, and zero elsewhere.
+
+        Args:
+            scale: A float scale factor for lifting Dirichlet BC.
+            x0: A global vector for lifting Dirichlet BC.
+            b_additional: A global vector to be summed with the vector `b`. Shell be used to apply Neuman BC.
+        """
         self.A.zeroEntries()
         with self.b.localForm() as b_local:
             b_local.set(0.0)
@@ -746,16 +818,21 @@ class CustomSolver:
 
         fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
 
-    def solve(self, 
-              du: fem.function.Function, 
-              scale: float = 1.0,
-              x0: np.ndarray = None,
-              b_additional: typing.Optional[PETSc.Vec] = None
-    ):
-        self.assemble(scale, x0, b_additional)
-        self.solver.solve(self.b, du.vector)
+    # def solve(self, 
+    #           du: fem.function.Function, 
+    #           scale: float = 1.0,
+    #           x0: np.ndarray = None,
+    #           b_additional: typing.Optional[PETSc.Vec] = None
+    # ):
+    #     self.assemble(scale, x0, b_additional)
+    #     self.solver.solve(self.b, du.vector)
 
     def solve(self, 
               du: fem.function.Function, 
-):
+    ):
+        """Solves the linear system and saves the solution into the vector `du`
+        
+        Args:
+            du: A global vector to be used as a container for the solution of the linear system
+        """
         self.solver.solve(self.b, du.vector)
