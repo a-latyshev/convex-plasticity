@@ -104,16 +104,10 @@ def get_kernel(form:ufl.form.Form):
     kernel = ufcx_form.integrals(0)[0].tabulate_tensor_float64
     return kernel
 
-c_signature = numba.types.void(
-    numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
-    numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
-    numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
-    numba.types.CPointer(numba.types.double),
-    numba.types.CPointer(numba.types.int32),
-    numba.types.CPointer(numba.types.uint8))
-
 def get_dummy_x(V: fem.FunctionSpace) -> la.vector:
     """Creates a vector with the size of two elements mesh.
+
+    It creates the same functional space as the given one, but based on another mesh, which is presented here in the form of a triangulated unit square with two elements. It returns the vector defined in the new functional space. This approach allows to allocate less memory for `fem.Function` objects, for example.
 
     Args:
         V: A functional space.
@@ -127,8 +121,7 @@ def get_dummy_x(V: fem.FunctionSpace) -> la.vector:
 class DummyFunction(fem.Function): #or ConstantFunction or BasicFunction ?
     """Expands the class `fem.Function` to allocate its values only on one element.
 
-    Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. We need an entity, which contains only local
-    We find the `fem.Function` constructor argument `x` very useful here. We can set the `fem.Function` global vector to a vector of another `fem.Function` object defined on a 
+    Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. We need an entity, which would contain only local values on an element. Then we update its values on every step of the custom assembling procedure. A behavior of the such entity is similar to the one of `fem.Constant`, but it is necessary to possess differents values of the entity on every finite element node. We find the `fem.Function` constructor argument `x` very useful here. We can set the `fem.Function` global vector to a vector of another `fem.Function` object defined on a different mesh, which can have less elements (2, for instance).
     
     Attribues: 
         values: A vector containing local values on only finite element.
@@ -243,6 +236,14 @@ class CustomFunction(fem.Function):
                 self.dummies.append(getattr(self, name))
             elif isinstance(coeff, fem.Function):
                 self.coefficients.append(getattr(self, name))
+
+c_signature = numba.types.void(
+    numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
+    numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
+    numba.types.CPointer(numba.typeof(PETSc.ScalarType())),
+    numba.types.CPointer(numba.types.double),
+    numba.types.CPointer(numba.types.int32),
+    numba.types.CPointer(numba.types.uint8))
 
 @numba.cfunc(c_signature, nopython=True)
 def dummy_tabulated(b_, w_, c_, coords_, local_index, orientation):
@@ -817,15 +818,6 @@ class CustomProblem:
         self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
         fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
-
-    # def solve(self, 
-    #           du: fem.function.Function, 
-    #           scale: float = 1.0,
-    #           x0: np.ndarray = None,
-    #           b_additional: typing.Optional[PETSc.Vec] = None
-    # ):
-    #     self.assemble(scale, x0, b_additional)
-    #     self.solver.solve(self.b, du.vector)
 
     def solve(self, 
               du: fem.function.Function, 

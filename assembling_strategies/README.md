@@ -221,7 +221,7 @@ We developed our own custom assembler which makes use of two new entities. This 
 
 ## Miscellaneous
 
-Here you find the table, which contains the time needed to resolve the problem and the approriate JIT overhead.
+Here you find the table, which contains the time needed to solve the problem and the appropriate JIT overhead.
 
 | Mesh | Time (s) | Elements nb. | Nodes nb. | JIT overhead (s)|
 | :---: | :---: | :----: | :---: | :---: |
