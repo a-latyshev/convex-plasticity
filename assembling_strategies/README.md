@@ -10,7 +10,7 @@ $$ F(u) = \int_\Omega \underline{\underline{\sigma}}(\underline{u}) : \underline
 where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFLx. Let us show you some examples
 
 - $\underline{\underline{\sigma}}(\underline{u}) = f(\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III})$,
-- $\underline{\underline{\sigma}}(\underline{u}) = \operatorname{argmin}\limits_\alpha g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
+- $\underline{\underline{\sigma}}(\underline{u}) = \underset{\alpha}{\operatorname{argmin}} \, g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
 
 where $\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III}$ are eigenvalues of $\underline{\underline{\varepsilon}}$ and $g$ some scalar function.
 
@@ -225,8 +225,8 @@ Here you find the table, which contains the time needed to solve the problem and
 
 | Mesh | Time (s) | Elements nb. | Nodes nb. | JIT overhead (s)|
 | :---: | :---: | :----: | :---: | :---: |
-| Sparsed | 2.7 | 1478 | 811 | 7.5 |
+| Coarse | 2.7 | 1478 | 811 | 7.5 |
 | Medium | 14 | 5716 | 3000 | 7.8 |
-| Dense | 100 | 25897 | 13251 | 4.9 |
+| Fine | 100 | 25897 | 13251 | 4.9 |
 
 We can conclude from this table, that the time spent on the JIT compilation operations is quite negligible, if we consider dense meshes.
