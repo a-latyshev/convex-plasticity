@@ -4,7 +4,7 @@
 
 We consider the following typical non-linear problem in our study:
 
-Find $\mathbf{u} \in V$, such that
+Find $\underline{u} \in V$, such that
 
 $$ F(\underline{u}) = \int_\Omega \underline{\underline{\sigma}}(\underline{u}) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{f} \underline{v} dx = 0 \quad \forall \underline{v} \in V,$$
 where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFLx. Let us show you some examples
@@ -69,13 +69,13 @@ $$ \partial\Omega_\text{right} : u_x = t \cdot u_\text{bc},$$
 where $\ u_\text{bc} $ is a maximal displacement on the right side of the beam, $\ t $ is a parameter varying from 0 to 1, and where $\ \underline{\underline{\sigma}}(\underline{\underline{\varepsilon}}) $ is our user-defined "oracle". Here we use a simple elastic behaviour:
 
 $$
-\boldsymbol{\sigma}(\boldsymbol{\varepsilon}) = \mathbf{C}:\boldsymbol{\varepsilon}
+\underline{\underline{\sigma}}(\underline{\underline{\varepsilon}}) = \mathbf{C}:\underline{\underline{\varepsilon}}
 $$
 
 and for which the derivative is:
 
 $$
-\dfrac{d\boldsymbol{\sigma}}{d\boldsymbol{\varepsilon}} = \mathbf{C}
+\dfrac{d\underline{\underline{\sigma}}}{d\underline{\underline{\varepsilon}}} = \mathbf{C}
 $$
 
 where $\mathbf{C}$ is the stiffness matrix.
@@ -126,7 +126,7 @@ where $\ \underline{\Delta u} $ is a displacement increment between two load ste
 
 $$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma}}_n + \mathbf{C} : \underline{\underline{\Delta\varepsilon}}, \quad \sigma^\text{eq}_\text{elas} = \sqrt{\frac{3}{2} \underline{\underline{s}} : \underline{\underline{s}}}$$ 
 
-$$\boldsymbol{s} = \mathsf{dev} \boldsymbol{\sigma_\text{elas}} $$
+$$\underline{\underline{s}} = \mathsf{dev} \, \underline{\underline{\sigma_\text{elas}}} $$
 
 $$ f_\text{elas} = \sigma^\text{eq}_\text{elas} - \sigma_0 - H p_n $$  
 
@@ -134,9 +134,9 @@ $$\Delta p = \frac{< f_\text{elas} >_+}{3\mu + H},$$
 
 $$\beta = \frac{3\mu}{\sigma^\text{eq}_\text{elas}}\Delta p$$
 
-$$\boldsymbol{n} = \frac{\boldsymbol{s}}{\sigma^\text{eq}_\text{elas}}$$
+$$\underline{\underline{n}} = \frac{\underline{\underline{s}}}{\sigma^\text{eq}_\text{elas}}$$
 
-$$\boldsymbol{\sigma}_{n+1} = \boldsymbol{\sigma_\text{elas}} - \beta \boldsymbol{s}$$
+$$\underline{\underline{\sigma}}_{n+1} = \underline{\underline{\sigma_\text{elas}}} - \beta \underline{\underline{s}}$$
 
 $$
     < f>_+ = 
