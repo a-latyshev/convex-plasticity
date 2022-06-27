@@ -2,20 +2,24 @@ import cvxpy as cp
 import numpy as np
 
 class vonMises:
-    def __init__(self):
+    def __init__(self, sigma0, hardening):
         self.sig0 = cp.Parameter()
-    def criterion(self, sig):
+        self.sig0.value = sigma0
+        self.H = hardening
+
+    def criterion(self, sig, p):
         dev = np.array([[2/3., -1/3., -1/3., 0],
                         [-1/3., 2/3., -1/3., 0],
                         [-1/3., -1/3., 2/3., 0],
                         [0, 0, 0, 1]])
         s = dev @ sig
-        return [np.sqrt(3/2)*cp.norm(s) <= self.sig0]
+        return [np.sqrt(3/2)*cp.norm(s) <= self.sig0 + self.H * p]
 
 class Rankine:
     def __init__(self):
         self.fc = cp.Parameter()
         self.ft = cp.Parameter()
+
     def criterion(self, sig):
         Sig = cp.bmat([[sig[0], sig[3]/np.sqrt(2), 0],
                       [sig[3]/np.sqrt(2), sig[1], 0],
@@ -30,13 +34,20 @@ class IsotropicElasticity:
         self.lambda_ = E*nu/(1+nu)/(1-2*nu)
         self.mu_ = E/2/(1+nu)        
     
+    # def C(self):
+    #     I = np.eye(3)
+    #     J4 = 1./3. * np.tensordot(I, I, axes=0)
+    #     I4 = np.einsum('ij,kl->ikjl', I, I)
+    #     K4 = DEV = I4 - J4
+    #     C_elas = (3*self.lambda_ + 2*self.mu_)*J4 + 2*self.mu_*K4
+    #     return C_elas
+
     def C(self):
-        I = np.eye(3)
-        J4 = 1./3. * np.tensordot(I, I, axes=0)
-        I4 = np.einsum('ij,kl->ikjl', I, I)
-        K4 = DEV = I4 - J4
-        C_elas = (3*self.lambda_ + 2*self.mu_)*J4 + 2*self.mu_*K4
-        return C_elas
+        l, m = self.lambda_, self.mu_
+        return np.array([[l+2*m, l, l, 0],
+                         [l, l+2*m, l, 0],
+                         [l, l, l+2*m, 0],
+                         [0, 0, 0, 2*m]])
 
 class Material:
     def __init__(self, constitutive_law, yield_criterion, plane_stress=False):
@@ -71,3 +82,22 @@ class ReturnMapping:
             self.prob.derivative()
             self.C_tang[i, :] = self.sig.delta
     
+from petsc4py import PETSc
+
+def to_Voight_vector(sigma):
+    sigma_vec = np.zeros(6, dtype=PETSc.ScalarType)
+    for i in range(3):
+        for j in range(3):
+            sigma_vec[Voight_indexes[i,j]] = sigma[i,j]
+    return sigma_vec
+
+def to_Voight_matrix(C):
+    C_matrix = np.zeros((6, 6), dtype=PETSc.ScalarType)
+    
+    for i in range(3):
+        for j in range(3):
+            for k in range(3):
+                for l in range(3):
+                    C_matrix[Voight_indexes[i,j], Voight_indexes[k,l]] = C[i,j,k,l]
+
+    return C_matrix
