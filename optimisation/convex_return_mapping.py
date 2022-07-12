@@ -3,7 +3,7 @@ import numpy as np
 
 class vonMises:
     def __init__(self, sigma0, hardening):
-        self.sig0 = cp.Parameter(nonneg=True, value=sigma0)
+        self.sig0 = sigma0
         # self.sig0.value = sigma0
 
         self.H = cp.Parameter(nonneg=True, value=hardening)
