@@ -65,6 +65,22 @@ class vonMises(YieldCriterion):
         s = dev @ sig
         return [np.sqrt(3/2)*cp.norm(s) <= self.sig0 + p * self.H]
 
+class DruckerPrager(YieldCriterion):
+    def __init__(self, sigma0:np.float64, alpha:np.float64, hardening:np.float64):
+        self.sig0 = sigma0
+        self.alpha = alpha # alpha = tg(phi), phi - l'angle de frottement
+        self.H = hardening
+
+    def criterion(self, sig:cp.expressions.variable.Variable, p:cp.expressions.variable.Variable):
+        dev = np.array([[2/3., -1/3., -1/3., 0],
+                        [-1/3., 2/3., -1/3., 0],
+                        [-1/3., -1/3., 2/3., 0],
+                        [0, 0, 0, 1.]])
+        tr = np.array([1, 1, 1, 0])
+        s = dev @ sig
+        sig_m = 1/3. * tr @ sig 
+        return [np.sqrt(3/2)*cp.norm(s) + self.alpha * sig_m <= self.sig0 + p * self.H]
+
 class Rankine(YieldCriterion):
     def __init__(self):
         self.fc = cp.Parameter()
@@ -118,6 +134,8 @@ class Material:
 class ReturnMapping:
     """An implementation of return-mapping procedure via convex problems solving.
 
+    
+
     Attributes:
         deps:
         sig_old:
@@ -139,7 +157,6 @@ class ReturnMapping:
         Note:
             We use here `cp.SCS` as it allows to calculate the derivatives of target variables.
         """
-        material = material
         self.deps = cp.Parameter((4,))
         self.sig_old = cp.Parameter((4,))
         sig_elas = self.sig_old + material.C @ self.deps
