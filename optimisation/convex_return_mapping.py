@@ -29,7 +29,9 @@ Remark. We work here with the Voigt notation, which can be described as follows:
 
 import cvxpy as cp
 import numpy as np
+import time
 from abc import ABC, abstractmethod
+from dolfinx import common
 
 class YieldCriterion(ABC):
     @abstractmethod
@@ -183,6 +185,8 @@ class ReturnMapping:
 
         self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
         self.solver = solver
+        self.convex_solving_time = 0.0
+        self.differentiation_time = 0.0
         
     def solve(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
@@ -190,11 +194,21 @@ class ReturnMapping:
         Args:
             **kwargs: additional solver attributes, such as tolerance, etc.
         """
-        self.opt_problem.solve(solver=self.solver, requires_grad=True, **kwargs)
-        for i in range(4):
-            self.deps.delta = self.e[i]
-            self.opt_problem.derivative()
-            self.C_tang[i, :] = self.sig.delta 
+
+        with common.Timer() as t: 
+            self.opt_problem.solve(solver=self.solver, requires_grad=True, **kwargs)
+            self.convex_solving_time = t.elapsed()[0] #time.time() - start #self.opt_problem.solver_stats.solve_time
+        
+        # start = time.time()
+        
+
+        with common.Timer() as t: 
+            for i in range(4):
+                self.deps.delta = self.e[i]
+                self.opt_problem.derivative()
+                self.C_tang[i, :] = self.sig.delta 
+            
+            self.differentiation_time = t.elapsed()[0] # time.time() - start
     
 # from petsc4py import PETSc
 
