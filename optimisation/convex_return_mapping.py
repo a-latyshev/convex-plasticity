@@ -71,11 +71,6 @@ class vonMises(YieldCriterion):
         sig0 = np.repeat(self.sig0, N)
         s = dev @ sig
 
-        # SUM = np.kron(np.eye(N), np.repeat(1, 4)) 
-        # s_norm = cp.Variable((N,))
-        # for i in range(N):
-        #     s_norm[i] = cp.norm(s[i*4:(i+1)*4])
-
         return [np.sqrt(3/2)*cp.norm(s, axis=0) <= sig0 + p * self.H]
 
 class DruckerPrager(YieldCriterion):
@@ -147,8 +142,6 @@ class Material:
 class ReturnMapping:
     """An implementation of return-mapping procedure via convex problems solving.
 
-    
-
     Attributes:
         deps:
         sig_old:
@@ -182,9 +175,7 @@ class ReturnMapping:
         self.sig_old.value = np.zeros((4, N))
         self.deps.value = np.zeros((4, N))
         self.p_old.value = np.zeros((N,))
-        # self.C_tang_tmp = np.zeros((4, N, 4, N))
         self.C_tang = np.zeros((N, 4, 4))
-        # self.e = np.eye(4, N)
 
         S = np.linalg.inv(material.C)
         delta_sig = self.sig - sig_elas
@@ -211,9 +202,8 @@ class ReturnMapping:
 
         with common.Timer() as t: 
             self.opt_problem.solve(solver=self.solver, requires_grad=True*derivation, **kwargs)
-            self.convex_solving_time = t.elapsed()[0] #time.time() - start #self.opt_problem.solver_stats.solve_time
+            self.convex_solving_time = t.elapsed()[0] 
         
-        # start = time.time()
         if derivation:
             with common.Timer() as t: 
                 for i in range(4):
@@ -224,9 +214,6 @@ class ReturnMapping:
                         self.opt_problem.derivative()
                         self.C_tang[j, :, i] = self.sig.delta[:, j] 
                 
-                # for i in range(4):
-                #     for j in range(N):
-                #         self.C_tang[j, :, i] = self.C_tang_tmp[i, j, :, j]
                 self.differentiation_time = t.elapsed()[0] # time.time() - start
     
 # from petsc4py import PETSc
