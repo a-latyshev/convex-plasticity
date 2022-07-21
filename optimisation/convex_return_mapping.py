@@ -31,6 +31,8 @@ import cvxpy as cp
 import numpy as np
 import time
 from abc import ABC, abstractmethod
+
+from ufl import energy_norm
 from dolfinx import common
 
 class YieldCriterion(ABC):
@@ -60,12 +62,21 @@ class vonMises(YieldCriterion):
         Returns:    
             A list with the condition of von Mises yield criterion
         """
+        N = p.size
         dev = np.array([[2/3., -1/3., -1/3., 0],
                         [-1/3., 2/3., -1/3., 0],
                         [-1/3., -1/3., 2/3., 0],
                         [0, 0, 0, 1.]])
+
+        sig0 = np.repeat(self.sig0, N)
         s = dev @ sig
-        return [np.sqrt(3/2)*cp.norm(s) <= self.sig0 + p * self.H]
+
+        # SUM = np.kron(np.eye(N), np.repeat(1, 4)) 
+        # s_norm = cp.Variable((N,))
+        # for i in range(N):
+        #     s_norm[i] = cp.norm(s[i*4:(i+1)*4])
+
+        return [np.sqrt(3/2)*cp.norm(s, axis=0) <= sig0 + p * self.H]
 
 class DruckerPrager(YieldCriterion):
     def __init__(self, sigma0:np.float64, alpha:np.float64, hardening:np.float64):
@@ -149,7 +160,7 @@ class ReturnMapping:
         opt_problem:
         solver:
     """
-    def __init__(self, material:Material, solver=cp.SCS):
+    def __init__(self, material:Material, N:int, solver=cp.SCS):
         """Inits ReturnMapping class.
         
         Args:
@@ -159,36 +170,39 @@ class ReturnMapping:
         Note:
             We use here `cp.SCS` as it allows to calculate the derivatives of target variables.
         """
-        self.deps = cp.Parameter((4,))
-        self.sig_old = cp.Parameter((4,))
+        self.N = N
+        self.deps = cp.Parameter((4, N))
+        self.sig_old = cp.Parameter((4, N))
         sig_elas = self.sig_old + material.C @ self.deps
-        self.sig = cp.Variable((4,))
+        self.sig = cp.Variable((4, N))
         
-        self.p_old = cp.Parameter(nonneg=True)
-        self.p = cp.Variable(nonneg=True)
+        self.p_old = cp.Parameter((N,), nonneg=True)
+        self.p = cp.Variable((N,),nonneg=True)
 
-        self.sig_old.value = np.zeros((4,))
-        self.deps.value = np.zeros((4,))
-        self.p_old.value = 0
-        self.C_tang = np.zeros((4, 4))
-        self.e = np.array([[1, 0, 0, 0],
-                           [0, 1, 0, 0],
-                           [0, 0, 1, 0],
-                           [0, 0, 0, 1]])
+        self.sig_old.value = np.zeros((4, N))
+        self.deps.value = np.zeros((4, N))
+        self.p_old.value = np.zeros((N,))
+        # self.C_tang_tmp = np.zeros((4, N, 4, N))
+        self.C_tang = np.zeros((N, 4, 4))
+        # self.e = np.eye(4, N)
 
-        target_expression = cp.quad_form(self.sig - sig_elas, np.linalg.inv(material.C)) + material.yield_criterion.H * cp.square(self.p - self.p_old)
+        S = np.linalg.inv(material.C)
+        delta_sig = self.sig - sig_elas
+        energy = []
+        for i in range(N):
+            energy.append(cp.quad_form(delta_sig[:, i], S))
+
+        target_expression = cp.sum(cp.hstack(energy)) + material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
 
         constrains = material.yield_criterion.criterion(self.sig, self.p) 
 
         if material.plane_stress:
-            constrains.append(self.sig[2] == 0)
+            constrains.append(self.sig[2] == 0) #TO MODIFY!
 
         self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
         self.solver = solver
-        self.convex_solving_time = 0.0
-        self.differentiation_time = 0.0
         
-    def solve(self, **kwargs):
+    def solve(self, derivation=True, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
         
         Args:
@@ -196,19 +210,24 @@ class ReturnMapping:
         """
 
         with common.Timer() as t: 
-            self.opt_problem.solve(solver=self.solver, requires_grad=True, **kwargs)
+            self.opt_problem.solve(solver=self.solver, requires_grad=True*derivation, **kwargs)
             self.convex_solving_time = t.elapsed()[0] #time.time() - start #self.opt_problem.solver_stats.solve_time
         
         # start = time.time()
-        
-
-        with common.Timer() as t: 
-            for i in range(4):
-                self.deps.delta = self.e[i]
-                self.opt_problem.derivative()
-                self.C_tang[i, :] = self.sig.delta 
-            
-            self.differentiation_time = t.elapsed()[0] # time.time() - start
+        if derivation:
+            with common.Timer() as t: 
+                for i in range(4):
+                    for j in range(self.N):
+                        e = np.zeros((4, self.N))
+                        e[i, j] = 1
+                        self.deps.delta = e
+                        self.opt_problem.derivative()
+                        self.C_tang[j, :, i] = self.sig.delta[:, j] 
+                
+                # for i in range(4):
+                #     for j in range(N):
+                #         self.C_tang[j, :, i] = self.C_tang_tmp[i, j, :, j]
+                self.differentiation_time = t.elapsed()[0] # time.time() - start
     
 # from petsc4py import PETSc
 
