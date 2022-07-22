@@ -29,10 +29,8 @@ Remark. We work here with the Voigt notation, which can be described as follows:
 
 import cvxpy as cp
 import numpy as np
-import time
 from abc import ABC, abstractmethod
 
-from ufl import energy_norm
 from dolfinx import common
 
 class YieldCriterion(ABC):

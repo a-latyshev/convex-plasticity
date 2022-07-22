@@ -3,6 +3,7 @@ import ufl
 from petsc4py import PETSc
 import basix
 import numpy as np
+import meshio 
 
 # The function performs a manual projection of an original_field function onto a target_field space 
 def project(original_field, target_field:fem.Function, dx:ufl.Measure=ufl.dx, bcs=[]):
@@ -44,19 +45,19 @@ def interpolate_quadrature(ufl_expr, fem_func:fem.Function):
     expr_expr = fem.Expression(ufl_expr, quadrature_points)
     expr_eval = expr_expr.eval(cells)
     fem_func.x.array[:] = expr_eval.flatten()[:]
-    fem_func.x.scatter_forward()
+    # fem_func.x.scatter_forward()
 
 # Defining the function to interpolate a function defined over quadrature elements
-def interpolate_quadrature(ufl_expr, q_dim, mesh):
-    basix_celltype = getattr(basix.CellType, mesh.topology.cell_type.name)
-    quadrature_points, weights = basix.make_quadrature(basix_celltype, q_dim)
-    map_c = mesh.topology.index_map(mesh.topology.dim)
-    num_cells = map_c.size_local + map_c.num_ghosts
-    cells = np.arange(0, num_cells, dtype=np.int32)
+# def interpolate_quadrature(ufl_expr, q_dim, mesh):
+#     basix_celltype = getattr(basix.CellType, mesh.topology.cell_type.name)
+#     quadrature_points, weights = basix.make_quadrature(basix_celltype, q_dim)
+#     map_c = mesh.topology.index_map(mesh.topology.dim)
+#     num_cells = map_c.size_local + map_c.num_ghosts
+#     cells = np.arange(0, num_cells, dtype=np.int32)
 
-    expr_expr = fem.Expression(ufl_expr, quadrature_points)
-    expr_eval = expr_expr.eval(cells)
-    return expr_eval
+#     expr_expr = fem.Expression(ufl_expr, quadrature_points)
+#     expr_eval = expr_expr.eval(cells)
+#     return expr_eval
 
 # Interpolate an expression on an element
 def interpolate_quadrature_on_element(expr, function_space:fem.FunctionSpace, mesh, cell_number):
@@ -70,3 +71,10 @@ def interpolate_quadrature_on_element(expr, function_space:fem.FunctionSpace, me
     expr_expr = fem.Expression(expr, quadrature_points)
     expr_eval = expr_expr.eval(cell_number)
     return expr_eval
+
+def create_mesh(mesh, cell_type, prune_z=False):
+    cells = mesh.get_cells_type(cell_type)
+    cell_data = mesh.get_cell_data("gmsh:physical", cell_type)
+    points = mesh.points[:,:2] if prune_z else mesh.points
+    out_mesh = meshio.Mesh(points=points, cells={cell_type: cells}, cell_data={"name_to_read":[cell_data]})
+    return out_mesh
