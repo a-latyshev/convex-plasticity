@@ -114,11 +114,11 @@ def get_dummy_x(V: fem.FunctionSpace) -> la.vector:
     Returns:
         A `VectorMetaClass` object defined on a square mesh with two elements.
     """
-    dummy_domain = mesh.create_unit_square(MPI.COMM_WORLD, 1, 1)
+    dummy_domain = mesh.create_unit_square(MPI.COMM_SELF, 1, 1) #TODO: COMM_WORLD 
     dummy_V = fem.FunctionSpace(dummy_domain, V._ufl_element)
     return la.vector(dummy_V.dofmap.index_map, dummy_V.dofmap.index_map_bs)
 
-class DummyFunction(fem.Function): #or ConstantFunction or BasicFunction ?
+class DummyFunction(fem.Function): #or ConstantFunction or BasicFunction or LazyFunction or Sparse function ?
     """Expands the class `fem.Function` to allocate its values only on one element.
 
     Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. We need an entity, which would contain only local values on an element. Then we update its values on every step of the custom assembling procedure. A behavior of the such entity is similar to the one of `fem.Constant`, but it is necessary to possess differents values of the entity on every finite element node. We find the `fem.Function` constructor argument `x` very useful here. We can set the `fem.Function` global vector to a vector of another `fem.Function` object defined on a different mesh, which can have less elements (2, for instance).
@@ -140,7 +140,7 @@ class DummyFunction(fem.Function): #or ConstantFunction or BasicFunction ?
         """
         self.value[:] = value
 
-class CustomFunction(fem.Function):
+class CustomFunction(fem.Function): #TODO: CustomExpression
     """Expands the class `fem.Function` and associates an appropriate mathematical expression.
 
     On a current dolfinx version we use `fem.Function` variable for `g` function defined as follows:  
