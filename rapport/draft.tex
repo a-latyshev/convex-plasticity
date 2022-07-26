@@ -23,6 +23,9 @@
 \newcommand\uuI{\ul{\ul{I}}}
 \newcommand\uuUnit{\ul{\ul{1}}}
 \newcommand\uueps{\ul{\ul{\varepsilon}}}
+\newcommand{\uuuuK}{\ul{\ul{\ul{\ul{K}}}}}
+\newcommand{\uuuuC}{\ul{\ul{\ul{\ul{C}}}}}
+\newcommand{\uuuuD}{\ul{\ul{\ul{\ul{D}}}}}
 
 \newcommand\Deltaepsp{\Delta \uueps_{n}^p}
 \newcommand\Deltaeps{\Delta \uueps_{n}}
@@ -33,7 +36,7 @@
 \newcommand\uusnelas{\uus_{n+1}^\text{elas}}
 \newcommand\uusigman{\ul{\ul{\sigma}}_{n+1}}
 \newcommand\uusigmanelas{\uusigman^{\text{elas}}}
-
+\newcommand{\uunelas}{\ul{\ul{n}}_\text{elas}}
 \newcommand\mtr{\mathrm{tr}}
 
 
@@ -80,21 +83,21 @@
     \dot{\uueps}^p = \dot{\lambda} \frac{\partial f}{\partial \uusigma} = \dot{\lambda} \left(\frac{3}{2} \frac{\uus}{\sigma_\text{eq}} + \alpha \uuUnit \right)
 \end{equation}
 
-\begin{equation}
-    \dot{p} = \sqrt{\frac{2}{3} \dot{\uueps}^p : \dot{\uueps}^p} = \dot{\lambda}\sqrt{1 + 2\alpha}
-\end{equation}
-
 \begin{align}
-    & \sigmaeqn + \alpha \mtr \uusigman - R(p_n + \Delta p_n) = 0 \\
-    & \uus_{n+1} = \uus_{n+1}^\text{elas} - 2\mu\Delta\uue_n^p \\
+    & \dot{p} = \sqrt{\frac{2}{3} \dot{\uueps}^p : \dot{\uueps}^p} = \dot{\lambda}\sqrt{1 + 2\alpha} \\
+    & \Deltaepsp = \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right) \\
+    & \Deltaep = \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \frac{3}{2} \frac{\uusn}{\sigmaeqn} 
+\end{align}
+\begin{align}
     & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaepsp - \kappa \mtr (\Deltaepsp) \uuUnit \\
-    & \Deltaepsp = \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right), \quad \Deltaep = \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \frac{3}{2} \frac{\uusn}{\sigmaeqn} \\
+    & \uus_{n+1} = \uus_{n+1}^\text{elas} - 2\mu\Delta\uue_n^p \\
     & \sigmaeqn = \sigmaeqnelas - \frac{3\mu}{\sqrt{1 + 2\alpha}}\Delta p_n \\
     & \mtr \uusigman = \mtr \uusigmanelas - (2 \mu + 3\kappa) \mtr \Deltaepsp \\
     & \mtr \Deltaepsp = \frac{3\alpha}{\sqrt{1 + 2\alpha}} \Delta p_n
 \end{align}
 
 \begin{align}
+    & \sigmaeqn + \alpha \mtr \uusigman - R(p_n + \Delta p_n) = 0 \\
     & R(p) = \sigma_0 + h p \\
     & \sigmaeqnelas - \frac{3\mu}{\sqrt{1 + 2\alpha}}\Delta p_n + \alpha \mtr \uusigmanelas - (2 \mu + 3\kappa) \frac{3\alpha^2}{\sqrt{1 + 2\alpha}} \Delta p_n - \sigma_0 - h p_n - h \Delta p_n = 0 \\
     & \Delta p_n = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \frac{3\mu + 3\alpha^2(2 \mu + 3\kappa)}{\sqrt{1 + 2\alpha}} + h} = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \gamma } \\
@@ -102,13 +105,25 @@
 \end{align}
 
 \begin{align}
-    & \frac{\partial (\mtr (\Deltaepsp) \uuUnit)}{\partial \Deltaeps} = \frac{\partial \Deltaepsp}{\partial \Deltaeps} : \uuUnit \otimes  \uuUnit \\
+    & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaepsp - \kappa \mtr (\Deltaepsp) \uuUnit \\
+    & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - \frac{1}{\sqrt{1 + 2\alpha}}\left( \beta \uusnelas + (2\mu + 3k)\alpha \Delta p_n \uuUnit \right) 
 \end{align}
 
 \begin{align}
-    & \frac{\partial \Deltaepsp}{\partial \Deltaeps} = \frac{\partial}{\partial \Deltaeps} \left( \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right) \\
-    & \frac{\partial \uusnelas{}}{\partial \Deltaeps} = \\
-    & \frac{\partial \sigmaeqnelas{}}{\partial \Deltaeps} = 
+    & \frac{\partial \uusnelas{}}{\partial \Deltaeps} = 2\mu \uuuuK\\
+    & \frac{\partial \sigmaeqnelas{}}{\partial \Deltaeps} = \frac{3\mu}{\sigmaeqnelas}\uusnelas \\
+    & \frac{\partial\mtr\sigmaeqnelas}{\partial\Deltaeps} = 3k\uuUnit \\
+    & \frac{\partial (\mtr (\Deltaepsp) )}{\partial \Deltaeps} = \uuUnit \\
+    & \frac{\partial \Deltaepsp}{\partial \Deltaeps} = \frac{\partial}{\partial \Deltaeps} \left( \frac{\Delta p_n}{\sqrt{1 + 2\alpha}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right)
+\end{align}
+
+\begin{align}
+    & \frac{\partial\uusigman}{\partial \Deltaeps} = \uuuuC - \frac{\partial (2\mu\Deltaepsp - k\mtr\Deltaepsp\uuUnit)}{\partial\Deltaeps} = \uuuuC - \uuuuD \\
+    & \uuuuD = (2\mu + 3k)\frac{\partial\Deltaepsp}{\partial\Deltaeps} \\
+    \frac{\partial \Deltaepsp}{\partial \Deltaeps} &= \frac{1}{\sqrt{1 + 2\alpha}}\left( \frac{\partial\Delta p_n}{\partial\Deltaeps} \otimes \left( \frac{3}{2}\frac{\uusnelas}{\sigmaeqnelas} + \alpha \uuUnit \right) + \Delta p_n \left(\frac{3}{2} \frac{\partial\uusnelas}{\partial\Deltaeps}\frac{1}{\sigmaeqnelas} \right) - \Delta p_n \frac{3}{2} \frac{\uusnelas}{(\sigmaeqnelas)^2} \otimes \frac{\partial\sigmaeqnelas}{\partial\Deltaeps}\right) = \\
+    & = \frac{1}{\sqrt{1 + 2\alpha}}\left( \left( 3\mu \uunelas + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( \frac{3}{2} \uunelas + \alpha\uuUnit \right) + \beta\uuuuK - \frac{3}{2}\beta\uunelas \otimes \uunelas \right) \\
+    & \uuuuD = \frac{(2\mu + 3k)}{\sqrt{1 + 2\alpha}}\left( \frac{3}{2} \left(\frac{3\mu}{\gamma} - \beta\right)\uunelas \otimes \uunelas + \frac{9\alpha k}{2\gamma} \uuUnit \otimes \uunelas + \frac{3\mu\alpha}{\gamma} \uunelas \otimes \uuUnit + \beta \uuuuK \right) \\
+    & \beta = \frac{\Delta p_n}{\sigmaeqnelas} 3\mu
 \end{align}
 
 \end{document}

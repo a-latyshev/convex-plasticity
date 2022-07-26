@@ -78,3 +78,19 @@ def create_mesh(mesh, cell_type, prune_z=False):
     points = mesh.points[:,:2] if prune_z else mesh.points
     out_mesh = meshio.Mesh(points=points, cells={cell_type: cells}, cell_data={"name_to_read":[cell_data]})
     return out_mesh
+
+from dolfinx.geometry import (BoundingBoxTree, compute_colliding_cells, compute_collisions)
+
+
+# Defining a cell containing (Ri, 0) point, where we calculate a value of u
+def find_cell_by_point(mesh, point):
+    cells = []
+    points_on_proc = []
+    tree = BoundingBoxTree(mesh, mesh.geometry.dim)
+    cell_candidates = compute_collisions(tree, point)
+    colliding_cells = compute_colliding_cells(mesh, cell_candidates, point)
+    for i, point in enumerate(point):
+        if len(colliding_cells.links(i)) > 0:
+            points_on_proc.append(point)
+            cells.append(colliding_cells.links(i)[0])
+    return cells, points_on_proc
