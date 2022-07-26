@@ -78,14 +78,17 @@ class DruckerPrager(YieldCriterion):
         self.H = hardening
 
     def criterion(self, sig:cp.expressions.variable.Variable, p:cp.expressions.variable.Variable):
+        N = p.size
         dev = np.array([[2/3., -1/3., -1/3., 0],
                         [-1/3., 2/3., -1/3., 0],
                         [-1/3., -1/3., 2/3., 0],
                         [0, 0, 0, 1.]])
         tr = np.array([1, 1, 1, 0])
         s = dev @ sig
+        sig0 = np.repeat(self.sig0, N)
+        alpha = np.repeat(self.alpha, N)
         sig_m = 1/3. * tr @ sig 
-        return [np.sqrt(3/2)*cp.norm(s) + self.alpha * sig_m <= self.sig0 + p * self.H]
+        return [np.sqrt(3/2)*cp.norm(s, axis=0) + alpha @ sig_m <= sig0 + p * self.H]
 
 class Rankine(YieldCriterion):
     def __init__(self):
