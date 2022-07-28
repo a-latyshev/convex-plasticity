@@ -8,22 +8,278 @@ from dolfinx import fem, io, common
 from mpi4py import MPI
 from petsc4py import PETSc
 
+import typing
+
 import sys
 sys.path.append("../")
 import fenicsx_support as fs
 
+SQRT2 = np.sqrt(2.)
 
-# if MPI.COMM_WORLD.rank == 0:
-#     #It works with the msh4 only!!
-#     msh = meshio.read("thick_cylinder_coarse.msh")
+class StandardProblem():
+    def __init__(self,
+                 dR: ufl.Form,
+                 R: ufl.Form,
+                 u: fem.Function,
+                 bcs: typing.List[fem.dirichletbc] = []
+    ):
+        self.u = u
+        self.bcs = bcs
 
-#     # Create and save one file for the mesh, and one file for the facets 
-#     triangle_mesh = fs.create_mesh(msh, "triangle", prune_z=True)
-#     line_mesh = fs.create_mesh(msh, "line", prune_z=True)
-#     meshio.write("thick_cylinder.xdmf", triangle_mesh)
-#     meshio.write("mt.xdmf", line_mesh)
-#     print(msh)
+        V = u.function_space
+        domain = V.mesh
+
+        self.R = R
+        self.dR = dR
+        self.b_form = fem.form(R)
+        self.A_form = fem.form(dR)
+        self.b = fem.petsc.create_vector(self.b_form)
+        self.A = fem.petsc.create_matrix(self.A_form)
+
+        self.comm = domain.comm
+
+        self.solver = self.solver_setup()
+
+
+    def solver_setup(self) -> PETSc.KSP:
+        """Sets the solver parameters."""
+        solver = PETSc.KSP().create(self.comm)
+        solver.setType("preonly")
+        solver.getPC().setType("lu")
+        solver.setOperators(self.A)
+        return solver
+
+    def assemble_vector(self):
+        with self.b.localForm() as b_local:
+            b_local.set(0.0)
+        fem.petsc.assemble_vector(self.b, self.b_form)
+        self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        fem.set_bc(self.b, self.bcs)
+
+    def assemble_matrix(self):
+        self.A.zeroEntries()
+        fem.petsc.assemble_matrix(self.A, self.A_form, bcs=bcs)
+        self.A.assemble()
+
+    def assemble(self):
+        self.assemble_matrix()
+        self.assemble_vector()
     
+    def solve(self, 
+              du: fem.function.Function, 
+    ):
+        """Solves the linear system and saves the solution into the vector `du`
+        
+        Args:
+            du: A global vector to be used as a container for the solution of the linear system
+        """
+        self.solver.solve(self.b, du.vector)
+
+
+class PlasticityFramework():
+    def __init__(self, material:crm.Material, mesh_name:str = "thick_cylinder.msh"):
+        if MPI.COMM_WORLD.rank == 0:
+            # It works with the msh4 only!!
+            msh = meshio.read(mesh_name)
+
+            # Create and save one file for the mesh, and one file for the facets 
+            triangle_mesh = fs.create_mesh(msh, "triangle", prune_z=True)
+            line_mesh = fs.create_mesh(msh, "line", prune_z=True)
+            meshio.write("thick_cylinder.xdmf", triangle_mesh)
+            meshio.write("mt.xdmf", line_mesh)
+            print(msh)
+        
+        with io.XDMFFile(MPI.COMM_WORLD, "thick_cylinder.xdmf", "r") as xdmf:
+            self.mesh = xdmf.read_mesh(name="Grid")
+            ct = xdmf.read_meshtags(self.mesh, name="Grid")
+
+        self.mesh.topology.create_connectivity(self.mesh.topology.dim, self.mesh.topology.dim - 1)
+
+        with io.XDMFFile(MPI.COMM_WORLD, "mt.xdmf", "r") as xdmf:
+            ft = xdmf.read_meshtags(self.mesh, name="Grid")
+
+        Re, Ri = 1.3, 1.   # external/internal radius
+
+        deg_u = 2
+        deg_stress = 2
+
+        self.V = fem.VectorFunctionSpace(self.mesh, ("CG", deg_u))
+
+        left_marker = 3
+        down_marker = 1
+        left_facets = ft.indices[ft.values == left_marker]
+        down_facets = ft.indices[ft.values == down_marker]
+        left_dofs = fem.locate_dofs_topological(V.sub(0), mesh.topology.dim-1, left_facets)
+        down_dofs = fem.locate_dofs_topological(V.sub(1), mesh.topology.dim-1, down_facets)
+
+        self.bcs = [fem.dirichletbc(PETSc.ScalarType(0), left_dofs, V.sub(0)), fem.dirichletbc(PETSc.ScalarType(0), down_dofs, V.sub(1))]
+
+        n = ufl.FacetNormal(mesh)
+        q_lim = float(2/np.sqrt(3)*np.log(Re/Ri)*material.yield_criterion.sig0)
+        loading = fem.Constant(mesh, PETSc.ScalarType(0.0 * q_lim))
+
+
+        ds = ufl.Measure("ds", domain=mesh, subdomain_data=ft)
+        dx = ufl.Measure(
+            "dx",
+            domain=mesh,
+            metadata={"quadrature_degree": deg_stress, "quadrature_scheme": "default"},
+        )
+
+        def F_ext(v):
+            return -loading * ufl.inner(n, v)*ds(4)
+
+
+        We = ufl.VectorElement("Quadrature", mesh.ufl_cell(), degree=deg_stress, dim=4, quad_scheme='default')
+        W0e = ufl.FiniteElement("Quadrature", mesh.ufl_cell(), degree=deg_stress, quad_scheme='default')
+        WTe = ufl.TensorElement("Quadrature", mesh.ufl_cell(), degree=deg_stress, shape=(4, 4), quad_scheme='default')
+
+        W = fem.FunctionSpace(mesh, We)
+        W0 = fem.FunctionSpace(mesh, W0e)
+        WT = fem.FunctionSpace(mesh, WTe)
+
+        sig = fem.Function(W)
+        sig_old = fem.Function(W)
+        p = fem.Function(W0, name="Cumulative_plastic_strain")
+        p_old = fem.Function(W0, name="Cumulative_plastic_strain")
+        u = fem.Function(V, name="Total_displacement")
+        du = fem.Function(V, name="Iteration_correction")
+        Du = fem.Function(V, name="Current_increment")
+        v = ufl.TrialFunction(V)
+        u_ = ufl.TestFunction(V)
+        C_tang = fem.Function(WT)
+
+        deps = fem.Function(W, name="deps")
+
+        P0 = fem.FunctionSpace(mesh, ("DG", 0))
+        p_avg = fem.Function(P0, name="Plastic_strain")
+
+
+        def eps(v):
+            e = ufl.sym(ufl.grad(v))
+            return ufl.as_tensor([[e[0, 0], e[0, 1], 0],
+                                [e[0, 1], e[1, 1], 0],
+                                [0, 0, 0]])
+
+        def sigma(eps_el):
+            return lmbda*ufl.tr(eps_el)*ufl.Identity(3) + 2*mu*eps_el
+
+        def as_3D_tensor(X):
+            return ufl.as_tensor([[X[0], X[3], 0],
+                                [X[3], X[1], 0],
+                                [0, 0, X[2]]])
+
+        ppos = lambda x: (x + ufl.sqrt(x**2))/2.
+        def proj_sig(deps, old_sig, old_p):
+            sig_n = as_3D_tensor(old_sig)
+            sig_elas = sig_n + sigma(deps)
+            s = ufl.dev(sig_elas)
+            sig_eq = ufl.sqrt(3/2.*ufl.inner(s, s))
+            f_elas = sig_eq - sig0 - H*old_p
+            dp = ppos(f_elas)/(3*mu+H)
+            n_elas = s/sig_eq*ppos(f_elas)/f_elas
+            beta = 3*mu*dp/sig_eq
+            new_sig = sig_elas-beta*s
+            return ufl.as_vector([new_sig[0, 0], new_sig[1, 1], new_sig[2, 2], new_sig[0, 1]]), \
+                ufl.as_vector([n_elas[0, 0], n_elas[1, 1], n_elas[2, 2], n_elas[0, 1]]), \
+                beta, dp       
+
+        def sigma_tang(e):
+            N_elas = as_3D_tensor(n_elas)
+            return sigma(e) - 3*mu*(3*mu/(3*mu+H)-beta)*ufl.inner(N_elas, e)*N_elas - 2*mu*beta*ufl.dev(e) 
+
+        a_Newton = ufl.inner(eps(v), sigma_tang(eps(u_)))*dx
+        res = -ufl.inner(eps(u_), as_3D_tensor(sig))*dx + F_ext(u_)
+
+        self.my_problem = StandardProblem(a_Newton, res, Du, bcs)
+
+    def solve(self, Nitermax: int = 200, tol: float = 1e-8, Nincr:int = 20):
+
+        load_steps = np.linspace(0, 1.1, Nincr+1)[1:]**0.5
+        results = np.zeros((Nincr+1, 2))
+        load_steps = load_steps
+        # xdmf = io.XDMFFile(MPI.COMM_WORLD, "plasticity.xdmf", "w", encoding=io.XDMFFile.Encoding.HDF5)
+        # xdmf.write_mesh(mesh)
+
+        sig.vector.set(0.0)
+        sig_old.vector.set(0.0)
+        p.vector.set(0.0)
+        u.vector.set(0.0)
+        n_elas.vector.set(0.0)
+        beta.vector.set(0.0)
+
+        self.my_problem.assemble_matrix()
+
+        return_mapping_times = np.zeros((len(load_steps)))
+
+        start = time.time()
+
+        for (i, t) in enumerate(load_steps):
+            return_mapping_times_tmp = []
+            loading.value = t * q_lim
+
+            my_problem.assemble_vector()
+
+            nRes0 = my_problem.b.norm() # Which one? - ufl.sqrt(Res.dot(Res))
+            nRes = nRes0
+            Du.x.array[:] = 0
+
+            if MPI.COMM_WORLD.rank == 0:
+                print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {t * q_lim}")
+            niter = 0
+
+
+            while nRes/nRes0 > tol and niter < Nitermax:
+                my_problem.solve(du)
+                # print('du', np.max(du.x.array), np.min(du.x.array), du.vector.norm())
+
+                Du.vector.axpy(1, du.vector) # Du = Du + 1*du
+                Du.x.scatter_forward() 
+
+                start_interpolate = time.time()
+
+                deps = eps(Du)
+                sig_, n_elas_, beta_, dp_ = proj_sig(deps, sig_old, p)
+
+                fs.interpolate_quadrature(sig_, sig)
+                fs.interpolate_quadrature(n_elas_, n_elas)
+                fs.interpolate_quadrature(beta_, beta)
+                # fs.interpolate_quadrature(dp_, dp)
+
+                return_mapping_times_tmp.append(time.time() - start_interpolate)
+
+                my_problem.assemble()
+
+                nRes = my_problem.b.norm() 
+
+                if MPI.COMM_WORLD.rank == 0:
+                    print(f"    Residual: {nRes}")
+                niter += 1
+            u.vector.axpy(1, Du.vector) # u = u + 1*Du
+            u.x.scatter_forward()
+
+            fs.interpolate_quadrature(dp_, dp)
+            p.vector.axpy(1, dp.vector)
+            p.x.scatter_forward()
+            print('p after copy', np.max(p.x.array), np.min(p.x.array), p.vector.norm())
+            
+            sig_old.x.array[:] = sig.x.array[:]
+
+            # fs.project(p, p_avg)
+            
+            # xdmf.write_function(u, t)
+            # xdmf.write_function(p_avg, t)
+
+            return_mapping_times[i] = np.mean(return_mapping_times_tmp)
+            print(f'rank#{MPI.COMM_WORLD.rank}: Time (mean return mapping) = {return_mapping_times[i]:.3f} (s)')
+
+            if len(points_on_proc) > 0:
+                results[i+1, :] = (u.eval(points_on_proc, cells)[0], t)
+
+        # xdmf.close()
+        # end = time.time()
+        print(f'\n rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {np.mean(return_mapping_times):.3f} (s)')
+        print(f'rank#{MPI.COMM_WORLD.rank}: Time = {time.time() - start:.3f} (s)')
 
 
 def solve_convex_plasticity_interpolation(sig0, material, patch_size=3):
