@@ -137,6 +137,7 @@ class Material:
     def __init__(self, constitutive_law, yield_criterion:YieldCriterion, plane_stress: bool = False):
         """Inits Material class."""
         self.C = constitutive_law.C()
+        self.constitutive_law = constitutive_law
         self.yield_criterion = yield_criterion
         self.plane_stress = plane_stress
                             
