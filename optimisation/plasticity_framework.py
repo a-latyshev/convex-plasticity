@@ -353,7 +353,7 @@ class StandardDPPlasticity(StandardPlasticity):
 
         def sigma_tang(e):
             N_elas = as_3D_tensor(self.n_elas)
-            return sigma(e) - ( 3*mu*(3*mu/M - self.beta) * ufl.inner(N_elas, e) * N_elas + 9*mu*k*alpha/M * ( ufl.inner(N_elas, e) * ufl.Identity(3) + ufl.tr(e) * N_elas ) + ( 27*k*k*alpha*alpha/M * ufl.tr(e) * ufl.Identity(3)) * self.beta / (self.beta + TPV) + 2*mu*self.beta*ufl.dev(e) ) / np.sqrt(1 + 2*alpha*alpha)
+            return sigma(e) - ( 3*mu*(3*mu/M - self.beta) * ufl.inner(N_elas, e) * N_elas + 9*mu*k*alpha/M * ( ufl.inner(N_elas, e) * ufl.Identity(3) + ufl.tr(e) * N_elas ) + ( 9*k*k*alpha*alpha/M * ufl.tr(e) * ufl.Identity(3)) * self.beta / (self.beta + TPV) + 2*mu*self.beta*ufl.dev(e) ) / np.sqrt(1 + 2*alpha*alpha)
 
         a_Newton = ufl.inner(self.eps(self.v_), sigma_tang(self.eps(self.u_)))*self.dx
         res = -ufl.inner(self.eps(self.u_), as_3D_tensor(self.sig))*self.dx + self.F_ext(self.u_)

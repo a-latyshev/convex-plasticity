@@ -130,16 +130,18 @@
     % & \frac{\partial (\mtr (\Deltaepsp) )}{\partial \Deltaeps} = \uuUnit \\
     % & \frac{\partial \Deltaepsp}{\partial \Deltaeps} = \frac{\partial}{\partial \Deltaeps} \left( \frac{\Delta p_n}{\sqrt{1 + 2\alpha^2}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right) \\
     & 2\mu\Deltaep + k\mtr\Deltaepsp\uuUnit = \frac{\Delta p_n}{\sqrt{1 + 2\alpha^2}} \left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \\
-    & \frac{\partial\Delta p_n}{\partial\Deltaeps} = \frac{1}{\gamma} \frac{\partial(\sigmaeqnelas + \alpha \mtr \uusigmanelas)}{\partial\Deltaeps}
+    & \frac{\partial\Delta p_n}{\partial\Deltaeps} = \frac{1}{\gamma} \frac{\partial(\sigmaeqnelas + \alpha \mtr \uusigmanelas)}{\partial\Deltaeps} = \frac{1}{\gamma} \left( \frac{3\mu}{\sigmaeqnelas}\uusnelas + 3k\alpha\uuUnit \right) = \frac{1}{\gamma}(3\mu \uunelas + 3k\uuUnit)
 \end{align}
 
 \begin{align}
     & \frac{\partial\uusigman}{\partial \Deltaeps} = \uuuuC - \frac{\partial (2\mu\Deltaep + k\mtr\Deltaepsp\uuUnit)}{\partial\Deltaeps} = \uuuuC - \uuuuD \\
     & \uuuuD = \frac{1}{\sqrt{1 + 2\alpha^2}} \frac{\partial }{\partial \Deltaeps} \left( \Delta p_n \left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \right) = \\
     & = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \frac{\partial\Delta p_n}{\partial\Deltaeps} \otimes \left( 3\mu\frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit \right) + \Delta p_n \left(3\mu\frac{\partial\uusnelas}{\partial\Deltaeps}\frac{1}{\sigmaeqnelas} \right) - \Delta p_n 3\mu\frac{\uusnelas}{(\sigmaeqnelas)^2} \otimes \frac{\partial\sigmaeqnelas}{\partial\Deltaeps}\right) = \\
-    & = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \left( 3\mu \uunelas + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( \frac{3}{2} \uunelas + \alpha\uuUnit \right) + \beta\uuuuK - \frac{3}{2}\beta\uunelas \otimes \uunelas \right) \\
-    & \uuuuD = \frac{2\mu + 3k}{\sqrt{1 + 2\alpha^2}}\left( \frac{3}{2} \left(\frac{3\mu}{\gamma} - \beta\right)\uunelas \otimes \uunelas + \frac{9\alpha k}{2\gamma} \uuUnit \otimes \uunelas + \frac{3\mu\alpha}{\gamma} \uunelas \otimes \uuUnit + \beta \uuuuK \right) \\
-    & \uuuuD : \Deltaeps = \frac{2\mu + 3k}{\sqrt{1 + 2\alpha^2}}\left( \frac{3}{2} \uunelas : \Deltaeps \left( \left(\frac{3\mu}{\gamma} - \beta\right)\uunelas + \frac{3\alpha k}{\gamma} \uuUnit \right) + \frac{3\mu\alpha}{\gamma} \uunelas \mtr\Deltaeps + \beta \uuuuK \right) \\
+    & = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \left( 3\mu \uunelas + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( 3\mu \uunelas + 3\alpha k \uuUnit \right) + 2\mu\beta\uuuuK - 3\mu\beta\uunelas \otimes \uunelas \right) \\
+    & \uuuuD = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uunelas \otimes \uunelas + \frac{9\alpha\mu k}{\gamma} (\uuUnit \otimes \uunelas + \uunelas \otimes \uuUnit) + \frac{9\alpha^2k^2}{\gamma} \uuUnit \otimes \uuUnit + 2\mu\beta \uuuuK \right) \\
+    % & \uuuuD : \Deltaeps = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \uunelas : \Deltaeps \left( \frac{9\alpha\mu k}{\gamma}\uuUnit + 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uunelas \right) + \mtr \Deltaeps \left( \frac{9\alpha\mu k}{\gamma}  \uunelas + \frac{9\alpha^2k^2}{\gamma} \uuUnit \right) + 2\mu\beta \Deltaep \right) \\
+    & \uuuuD : \Deltaeps = \\
+    & = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \uunelas : \Deltaeps 3\mu \left( \frac{3\mu}{\gamma} - \beta \right) \uunelas + \frac{9\alpha\mu k}{\gamma} (\uunelas : \Deltaeps \uuUnit + \mtr\Deltaeps \uunelas) + \frac{9\alpha^2k^2}{\gamma} \mtr \Deltaeps \uuUnit + 2\mu\beta \Deltaep \right)  \\
 \end{align}
 
 \end{document}

@@ -9,7 +9,6 @@ __pycache__/
 *.fls
 *.log
 *.out
-*.pdf
 *.synctex.gz
 *.nav
 *.snm
