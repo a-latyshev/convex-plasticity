@@ -86,9 +86,9 @@ class DruckerPrager(YieldCriterion):
         tr = np.array([1, 1, 1, 0])
         s = dev @ sig
         sig0 = np.repeat(self.sig0, N)
-        alpha = np.repeat(self.alpha, N)
-        sig_m = 1/3. * tr @ sig 
-        return [np.sqrt(3/2)*cp.norm(s, axis=0) + alpha @ sig_m <= sig0 + p * self.H]
+        alpha = self.alpha
+        sig_m = tr @ sig 
+        return [np.sqrt(3/2)*cp.norm(s, axis=0) + alpha * sig_m <= sig0 + p * self.H]
 
 class Rankine(YieldCriterion):
     def __init__(self):
