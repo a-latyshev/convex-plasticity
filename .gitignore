@@ -14,3 +14,7 @@ __pycache__/
 *.snm
 *.toc
 **/_minted**
+*.so
+**/build
+**/code_dir
+_*.*

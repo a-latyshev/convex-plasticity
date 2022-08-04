@@ -2,12 +2,14 @@ typedef int c_int;
 typedef double c_float;
 
 // Update user-defined parameter values
-extern void cpg_update_A(c_int idx, c_float val);
-extern void cpg_update_b(c_int idx, c_float val);
+extern void cpg_update_sig_old(c_int idx, c_float val);
+extern void cpg_update_deps(c_int idx, c_float val);
 
 // Map user-defined to canonical parameters
-extern void cpg_canonicalize_A();
 extern void cpg_canonicalize_b();
+
+// Retrieve dual solution in terms of user-defined constraints
+extern void cpg_retrieve_dual();
 
 // Retrieve solver information
 extern void cpg_retrieve_info();
@@ -34,32 +36,33 @@ extern void cpg_set_solver_acceleration_interval(c_int acceleration_interval_new
 extern void cpg_set_solver_write_data_filename(const char* write_data_filename_new);
 extern void cpg_set_solver_log_csv_filename(const char* log_csv_filename_new);
 
+// User-defined parameters
 typedef struct {
-    double A[3];
-    double b[3];
+    double sig_old[4];
+    double deps[4];
 } CPG_Params_cpp_t;
 
 // Flags for updated user-defined parameters
 typedef struct {
-    bool A;
-    bool b;
+    bool sig_old;
+    bool deps;
 } CPG_Updated_cpp_t;
 
 // Primal solution
 typedef struct {
-    double x[2];
+    double sig[4];
 } CPG_Prim_cpp_t;
 
 // Dual solution
 typedef struct {
-    double d0[2];
+    double d0;
 } CPG_Dual_cpp_t;
 
 // Solver information
 typedef struct {
     double obj_val;
     int iter;
-//  char* status;
+    // char* status;
     double pri_res;
     double dua_res;
     double time;
@@ -72,4 +75,5 @@ typedef struct {
     CPG_Info_cpp_t info;
 } CPG_Result_cpp_t;
 
+// Main solve function
 void solve_cpp(CPG_Updated_cpp_t *CPG_Updated_cpp, CPG_Params_cpp_t *CPG_Params_cpp, CPG_Result_cpp_t *CPG_Result_cpp);
