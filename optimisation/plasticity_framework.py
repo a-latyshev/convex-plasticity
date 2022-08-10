@@ -20,11 +20,12 @@ import fenicsx_support as fs
 SQRT2 = np.sqrt(2.)
 
 class StandardProblem():
-    def __init__(self,
-                 dR: ufl.Form,
-                 R: ufl.Form,
-                 u: fem.Function,
-                 bcs: typing.List[fem.dirichletbc] = []
+    def __init__(
+        self,
+        dR: ufl.Form,
+        R: ufl.Form,
+        u: fem.Function,
+        bcs: typing.List[fem.dirichletbc] = []
     ):
         self.u = u
         self.bcs = bcs
@@ -43,7 +44,6 @@ class StandardProblem():
 
         self.solver = self.solver_setup()
 
-
     def solver_setup(self) -> PETSc.KSP:
         """Sets the solver parameters."""
         solver = PETSc.KSP().create(self.comm)
@@ -52,31 +52,156 @@ class StandardProblem():
         solver.setOperators(self.A)
         return solver
 
-    def assemble_vector(self):
+    def assemble_vector(self) -> None:
         with self.b.localForm() as b_local:
             b_local.set(0.0)
         fem.petsc.assemble_vector(self.b, self.b_form)
         self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
         fem.set_bc(self.b, self.bcs)
 
-    def assemble_matrix(self):
+    def assemble_matrix(self) -> None:
         self.A.zeroEntries()
         fem.petsc.assemble_matrix(self.A, self.A_form, bcs=self.bcs)
         self.A.assemble()
 
-    def assemble(self):
+    def assemble(self) -> None:
         self.assemble_matrix()
         self.assemble_vector()
     
-    def solve(self, 
-              du: fem.function.Function, 
-    ):
+    def solve (
+        self, 
+        du: fem.function.Function, 
+    ) -> None:
         """Solves the linear system and saves the solution into the vector `du`
         
         Args:
             du: A global vector to be used as a container for the solution of the linear system
         """
         self.solver.solve(self.b, du.vector)
+
+class SNESProblem(StandardProblem):
+    """
+    Problem class compatible with PETSC.SNES solvers.
+    """
+
+    def __init__(
+        self,
+        F_form: ufl.Form,
+        u: fem.Function,
+        bcs: typing.List[fem.dirichletbc] = [],
+        J_form: ufl.Form = None,
+        # bounds=None,
+        petsc_options={},
+        form_compiler_parameters={},
+        jit_parameters={},
+        monitor=None,
+        prefix=None,
+    ):
+        # Give PETSc solver options a unique prefix
+        if prefix is None:
+            prefix = "snes_{}".format(str(id(self))[0:4])
+
+        self.prefix = prefix
+        self.petsc_options = petsc_options
+
+        if J_form is None:
+            V = u.function_space
+            J_form = ufl.derivative(F_form, u, ufl.TrialFunction(V))
+        
+        super().__init__(J_form, F_form, u, bcs)
+        
+        self.monitor = monitor
+        
+    def set_petsc_options(self) -> None:
+        # Set PETSc options
+        opts = PETSc.Options()
+        opts.prefixPush(self.prefix)
+        
+        for k, v in self.petsc_options.items():
+            opts[k] = v
+
+        opts.prefixPop()
+
+    def solver_setup(self) -> PETSc.SNES:
+        # Create nonlinear solver
+        snes = PETSc.SNES().create(self.comm)
+
+        # Set options
+        snes.setOptionsPrefix(self.prefix)
+        self.set_petsc_options()
+
+        snes.setFunction(self.assemble_vector, self.b)
+        snes.setJacobian(self.assemble_matrix, self.A)
+
+        # We set the bound (Note: they are passed as reference and not as values)
+
+        # if self.monitor is not None:
+        #     snes.setMonitor(self.monitor)
+
+        snes.setFromOptions()
+
+        return snes
+
+    def assemble_vector(self, snes: PETSc.SNES, x: PETSc.Vec, b: PETSc.Vec) -> None:
+        """Assemble the residual F into the vector b.
+
+        Parameters
+        ==========
+        snes: the snes object
+        x: Vector containing the latest solution.
+        b: Vector to assemble the residual into.
+        """
+        # We need to assign the vector to the function
+
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        x.copy(self.u.vector)
+        self.u.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+
+        super().assemble_vector()
+        # # Zero the residual vector
+        # with b.localForm() as b_local:
+        #     b_local.set(0.0)
+        # fem.petsc.assemble_vector(b, self.F_form)
+
+        # # Apply boundary conditions
+        # fem.petsc.apply_lifting(b, [self.J_form], [self.bcs], [x], -1.0)
+        # b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        # fem.petsc.set_bc(b, self.bcs, x, -1.0)
+
+    def assemble_matrix(self, snes, x: PETSc.Vec, A: PETSc.Mat, P: PETSc.Mat) -> None:
+        """Assemble the Jacobian matrix.
+
+        Parameters
+        ==========
+        x: Vector containing the latest solution.
+        A: Matrix to assemble the Jacobian into.
+        """
+        super().assemble_matrix()
+
+    def solve(self):
+        # log(LogLevel.INFO, f"Solving {self.prefix}")
+
+        # try:
+            # dolfinx.log.set_log_level(dolfinx.log.LogLevel.INFO)
+        self.solver.solve(None, self.u.vector)
+        # print(
+        #     f"{self.prefix} SNES solver converged in",
+        #     self.solver.getIterationNumber(),
+        #     "iterations",
+        #     "with converged reason",
+        #     self.solver.getConvergedReason(),
+        # )
+        self.u.vector.ghostUpdate(
+            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
+        )
+        return (self.solver.getIterationNumber(), self.solver.getConvergedReason())
+
+        # except Warning:
+        #     log(
+        #         LogLevel.WARNING,
+        #         f"WARNING: {self.prefix} solver failed to converge, what's next?",
+        #     )
+        #     raise RuntimeError(f"{self.prefix} solvers did not converge")
 
 class AbstractPlasticity():
     def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh"):
