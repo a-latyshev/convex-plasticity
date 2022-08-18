@@ -19,8 +19,7 @@ sys.path.append("../")
 import fenicsx_support as fs
 
 import logging
-# logger = logging.getLogger()
-# logger.setLevel(logging.INFO)
+LOG_INFO_STAR = logging.INFO + 5
 
 SQRT2 = np.sqrt(2.)
 
@@ -99,7 +98,7 @@ class NonlinearProblem(LinearProblem):
         self.tol = tol
         self.du = fem.Function(self.u.function_space)
     
-    def solve(self, inside_Newton: Callable, logger) -> None:
+    def solve(self, inside_Newton: Callable, logger: logging.Logger) -> None:
         
         self.assemble_vector()
 
@@ -141,6 +140,7 @@ class SNESProblem(LinearProblem):
         self,
         F_form: ufl.Form,
         u: fem.Function,
+        inside_Newton: Callable,
         bcs: List[fem.dirichletbc] = [],
         J_form: Optional[ufl.Form] = None,
         petsc_options: Dict[str, Union[str, int, float]] = {},
@@ -158,6 +158,9 @@ class SNESProblem(LinearProblem):
             J_form = ufl.derivative(F_form, u, ufl.TrialFunction(V))
         
         super().__init__(J_form, F_form, u, bcs)
+
+        self.inside_Newton = inside_Newton
+        self.du = fem.Function(self.u.function_space)
                 
     def set_petsc_options(self) -> None:
         # Set PETSc options
@@ -175,7 +178,7 @@ class SNESProblem(LinearProblem):
 
         # Set options
         snes.setOptionsPrefix(self.prefix)
-        self.set_petsc_options()
+        self.set_petsc_options()        
 
         snes.setFunction(self.assemble_vector, self.b)
         snes.setJacobian(self.assemble_matrix, self.A)
@@ -195,11 +198,32 @@ class SNESProblem(LinearProblem):
         """
         # We need to assign the vector to the function
 
-        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
-        x.copy(self.u.vector)
-        self.u.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        # self.du.set(0.0)
+
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD) # x_{k+1} = x_k + dx_k, where dx_k = x ?
+        x.copy(self.u.vector) 
+        self.u.x.scatter_forward()
+
+        # self.u.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+
+        # self.u.vector.axpy(1, self.du.vector) # u = u + 1*x
+        # self.u.x.scatter_forward()
+
+        print('x norm', x.norm())
+        print('b norm', self.b.norm())
 
         super().assemble_vector()
+
+        self.inside_Newton()
+
+        print('b norm', self.b.norm())
+
+        super().assemble_vector()
+
+        # super().assemble_matrix()
+
+        print('b norm', self.b.norm())
+
 
 
     def assemble_matrix(self, snes, x: PETSc.Vec, A: PETSc.Mat, P: PETSc.Mat) -> None:
@@ -210,9 +234,16 @@ class SNESProblem(LinearProblem):
         x: Vector containing the latest solution.
         A: Matrix to assemble the Jacobian into.
         """
+
+        # self.inside_Newton()
+
+        # print('A norm', self.A.norm()) #error!
+
         super().assemble_matrix()
 
-    def solve(self, logger) -> None:
+        print('A norm', self.A.norm())
+
+    def solve(self, inside_Newton: Callable, logger: logging.Logger) -> None:
     
         start = time.time()
 
@@ -221,13 +252,13 @@ class SNESProblem(LinearProblem):
         logger.debug(f'rank#{MPI.COMM_WORLD.rank}  {self.prefix} SNES solver converged in {self.solver.getIterationNumber()} iterations with converged reason {self.solver.getConvergedReason()})')
         logger.debug(f'rank#{MPI.COMM_WORLD.rank}  Time (Step) = {time.time() - start:.2f} (s)\n')
 
-        self.u.vector.ghostUpdate(
-            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
-        )
+        self.u.x.scatter_forward()
+
+        # self.inside_Newton()
     
 
 class AbstractPlasticity():
-    def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh", logger = logging.getLogger()):
+    def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh", logger: logging.Logger = logging.getLogger()):
         if MPI.COMM_WORLD.rank == 0:
             # It works with the msh4 only!!
             msh = meshio.read(mesh_name)
@@ -353,7 +384,7 @@ class AbstractPlasticity():
         # xdmf.close()
         # end = time.time()
         # self.logger.info(f'\n rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {np.mean(return_mapping_times):.3f} (s)')
-        self.logger.info(f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {time.time() - start:.2f} (s)')
+        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {time.time() - start:.2f} (s)')
 
         return self.points_on_proc, results
 
@@ -486,8 +517,8 @@ class DruckerPragerPlasticity(vonMisesPlasticity):
         self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs, Nitermax = 200, tol = 1e-8)
 
 class ConvexPlasticity(AbstractPlasticity):
-    def __init__(self, material: crm.Material, patch_size: int = 1, mesh_name: str = "thick_cylinder.msh"):
-        super().__init__(material, mesh_name)
+    def __init__(self, material: crm.Material, patch_size: int = 1, mesh_name: str = "thick_cylinder.msh", logger: logging.Logger = logging.getLogger()):
+        super().__init__(material, mesh_name, logger)
 
         We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
         W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')
@@ -546,9 +577,7 @@ class ConvexPlasticity(AbstractPlasticity):
         a_Newton = ufl.inner(eps_vec(self.v_), ufl.dot(self.C_tang, eps_vec(self.u_)))*self.dx 
         res = -ufl.inner(self.eps(self.u_), as_3D_tensor(self.sig))*self.dx + self.F_ext(self.u_)
 
-        self.problem = LinearProblem(a_Newton, res, self.Du, self.bcs)
-
-        self.all_C_tang = []
+        self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs)
 
     def inside_Newton(self):
         tol = 1e-13
@@ -579,8 +608,6 @@ class ConvexPlasticity(AbstractPlasticity):
         self.p_old.x.array[:] = self.p.x.array        
         self.sig_old.x.array[:] = self.sig.x.array
 
-        # self.all_C_tang.append(np.array(self.C_tang.x.array))
-
     def initialize_variables(self):
         self.sig.vector.set(0.0)
         self.sig_old.vector.set(0.0)
@@ -591,8 +618,114 @@ class ConvexPlasticity(AbstractPlasticity):
         for i in range(self.n_quadrature_points):
             self.C_tang.x.array.reshape((-1, 4, 4))[i,:,:] = self.material.C
 
+class ConvexPlasticitySNES(ConvexPlasticity):
+    def __init__(self, material: crm.Material, patch_size: int = 1, mesh_name: str = "thick_cylinder.msh", logger: logging.Logger = logging.getLogger()):
+        super().__init__(material, mesh_name, logger)
+
+        We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
+        W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')
+        WTe = ufl.TensorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, shape=(4, 4), quad_scheme='default')
+        
+        W = fem.FunctionSpace(self.mesh, We)
+        W0 = fem.FunctionSpace(self.mesh, W0e)
+        WT = fem.FunctionSpace(self.mesh, WTe)
+
+        self.sig = fem.Function(W)
+        self.sig_old = fem.Function(W)
+        self.p = fem.Function(W0, name="Cumulative_plastic_strain")
+        self.p_old = fem.Function(W0) 
+
+        self.C_tang = fem.Function(WT)
+        self.deps = fem.Function(W, name="deps")
+        
+        def eps_vec(v):
+            e = ufl.sym(ufl.grad(v))
+            return ufl.as_vector([e[0, 0], e[1, 1], 0, SQRT2 * e[0, 1]])
+
+        def as_3D_tensor(X):
+            return ufl.as_tensor([[X[0], X[3] / SQRT2, 0],
+                                [X[3] / SQRT2, X[1], 0],
+                                [0, 0, X[2]]])       
+
+        self.eps_vec = eps_vec
+
+        self.n_quadrature_points = len(self.C_tang.x.array.reshape((-1, 4, 4)))
+        for i in range(self.n_quadrature_points):
+            self.C_tang.x.array.reshape((-1, 4, 4))[i,:,:] = material.C
+
+        self.N_patches = int(self.n_quadrature_points / patch_size)
+        self.residue_size = self.n_quadrature_points % patch_size
+
+        self.return_mapping = crm.ReturnMapping(material, patch_size)
+        self.material = material
+
+        self.p_values = self.p.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
+        self.p_old_values = self.p_old.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
+        self.deps_values = self.deps.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
+        self.sig_values = self.sig.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
+        self.sig_old_values = self.sig_old.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
+        self.C_tang_values = self.C_tang.x.array[:4*4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4, 4))
+
+        if self.residue_size != 0:
+            self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size)
+            
+            self.p_values_residue = self.p.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
+            self.p_old_values_residue = self.p_old.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
+            self.deps_values_residue = self.deps.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
+            self.sig_values_residue = self.sig.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
+            self.sig_old_values_residue = self.sig_old.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
+            self.C_tang_values_residue = self.C_tang.x.array[4*4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4, 4))
+
+        a_Newton = ufl.inner(eps_vec(self.v_), ufl.dot(self.C_tang, eps_vec(self.u_)))*self.dx 
+        res = -ufl.inner(self.eps(self.u_), as_3D_tensor(self.sig))*self.dx + self.F_ext(self.u_)
+
+        self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs)
+
+        residual = ufl.inner(as_3D_tensor(self.sig) + sigma(self.eps(self.Du) - deps_p(self.eps(self.Du), self.sig, self.p)), self.eps(self.u_))*self.dx - self.F_ext(self.u_)
+
+        petsc_options = {
+            "snes_type": "vinewtonrsls",
+            "snes_linesearch_type": "basic",
+            "ksp_type": "preonly",
+            "pc_type": "lu",
+            "pc_factor_mat_solver_type": "mumps",
+            "snes_atol": 1.0e-08,
+            "snes_rtol": 1.0e-09,
+            "snes_stol": 0.0,
+            "snes_max_it": 500,
+            "snes_monitor_cancel": "",
+        }
+
+        self.problem = SNESProblem(residual, self.Du, self.bcs, petsc_options = petsc_options)
+
+
+    def inside_Newton(self):
+        tol = 1e-13
+        fs.interpolate_quadrature(self.eps_vec(self.Du), self.deps) # eps_xy * sqrt(2.)!
+        for q in range(self.N_patches):
+            self.return_mapping.deps.value[:] = self.deps_values[q,:].T
+            self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
+            self.return_mapping.p_old.value = self.p_old_values[q,:]
+            
+            self.return_mapping.solve(derivation=True, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol) #, alpha=1, scale=5.
+
+            self.sig_values[q,:] = self.return_mapping.sig.value[:].T
+            self.p_values[q,:] = self.return_mapping.p.value
+            self.C_tang_values[q,:] = self.return_mapping.C_tang[:]
+
+        if self.residue_size != 0: #how to improve ?
+            self.return_mapping_residue.deps.value[:] = self.deps_values_residue[0,:].T
+            self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
+            self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
+            
+            self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol) #, alpha=1, scale=5.
+            
+            self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
+            self.p_values_residue[0,:] = self.return_mapping_residue.p.value
+            self.C_tang_values_residue[0,:] = self.return_mapping_residue.C_tang[:]
+
 class vonMisesPlasticitySNES(AbstractPlasticity):
-    def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh", logger=logging.getLogger()):
+    def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh", logger: logging.Logger = logging.getLogger()):
         super().__init__(material, mesh_name, logger)
 
         We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
@@ -683,35 +816,27 @@ class vonMisesPlasticitySNES(AbstractPlasticity):
         start = time.time()
 
         for (i, t) in enumerate(load_steps):
-            # return_mapping_times_tmp = []
             self.loading.value = t * self.q_lim
 
             nRes0 = self.problem.b.norm() 
             self.logger.info(f'rank#{MPI.COMM_WORLD.rank}: Step: {str(i+1)}, norm(nRes0) = {nRes0:.1e}, load = {t * self.q_lim}')
             self.problem.solve(self.logger)
             
-            # if MPI.COMM_WORLD.rank == 0:
-            #     print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {t * self.q_lim}")
-
             self.u.vector.axpy(1, self.Du.vector) # u = u + 1*Du
             self.u.x.scatter_forward()
 
             self.after_Newton()
-        
-            # logger.debug(f'rank#{MPI.COMM_WORLD.rank}  Increment: {niter}, norm(Res/Res0) = {nRes/nRes0:.1e}. Time (return mapping) = {end_return_mapping - start_return_mapping:.2f} (s)')
             
             if len(self.points_on_proc) > 0:
                 results[i+1, :] = (self.u.eval(self.points_on_proc, self.cells)[0], t)
 
-        # print(f'\n rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {np.mean(return_mapping_times):.3f} (s)')
-        # print(f'rank#{MPI.COMM_WORLD.rank}: Time = {time.time() - start:.3f} (s)')
-        self.logger.info(f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {time.time() - start:.2f} (s)')
+        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {time.time() - start:.2f} (s)')
 
         return self.points_on_proc, results
 
 class DruckerPragerPlasticitySNES(vonMisesPlasticitySNES):
-    def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh"):
-        super().__init__(material, mesh_name)
+    def __init__(self, material: crm.Material, mesh_name: str = "thick_cylinder.msh", logger: logging.Logger = logging.getLogger()):
+        super().__init__(material, mesh_name, logger)
 
         We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
         W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')
@@ -783,7 +908,7 @@ class DruckerPragerPlasticitySNES(vonMisesPlasticitySNES):
             "snes_rtol": 1.0e-09,
             "snes_stol": 0.0,
             "snes_max_it": 500,
-            "snes_monitor": "",
+            "snes_monitor_cancel": "",
         }
 
         self.problem = SNESProblem(residual, self.Du, self.bcs, petsc_options = petsc_options)

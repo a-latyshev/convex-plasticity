@@ -72,12 +72,12 @@ class vonMises(YieldCriterion):
         return [np.sqrt(3/2)*cp.norm(s, axis=0) <= sig0 + p * self.H]
 
 class DruckerPrager(YieldCriterion):
-    def __init__(self, sigma0:np.float64, alpha:np.float64, hardening:np.float64):
+    def __init__(self, sigma0: np.float64, alpha: np.float64, hardening: np.float64):
         self.sig0 = sigma0
         self.alpha = alpha # alpha = tg(phi), phi - l'angle de frottement
         self.H = hardening
 
-    def criterion(self, sig:cp.expressions.variable.Variable, p:cp.expressions.variable.Variable):
+    def criterion(self, sig: cp.expressions.variable.Variable, p: cp.expressions.variable.Variable):
         N = p.size
         dev = np.array([[2/3., -1/3., -1/3., 0],
                         [-1/3., 2/3., -1/3., 0],
@@ -89,13 +89,14 @@ class DruckerPrager(YieldCriterion):
         alpha = self.alpha
         sig_m = tr @ sig 
         return [np.sqrt(3/2)*cp.norm(s, axis=0) + alpha * sig_m <= sig0 + p * self.H]
+    
 
 class Rankine(YieldCriterion):
     def __init__(self):
         self.fc = cp.Parameter()
         self.ft = cp.Parameter()
 
-    def criterion(self, sig:cp.expressions.variable.Variable):
+    def criterion(self, sig: cp.expressions.variable.Variable):
         Sig = cp.bmat([[sig[0], sig[3]/np.sqrt(2), 0],
                       [sig[3]/np.sqrt(2), sig[1], 0],
                       [0, 0, sig[2]]])
