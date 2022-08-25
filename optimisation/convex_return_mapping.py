@@ -167,13 +167,13 @@ class ReturnMapping:
             We use here `cp.SCS` as it allows to calculate the derivatives of target variables.
         """
         self.N = N
-        self.deps = cp.Parameter((4, N))
-        self.sig_old = cp.Parameter((4, N))
+        self.deps = cp.Parameter((4, N), name='deps')
+        self.sig_old = cp.Parameter((4, N), name='sig_old')
         sig_elas = self.sig_old + material.C @ self.deps
-        self.sig = cp.Variable((4, N))
+        self.sig = cp.Variable((4, N), name='sig')
         
-        self.p_old = cp.Parameter((N,), nonneg=True)
-        self.p = cp.Variable((N,),nonneg=True)
+        self.p_old = cp.Parameter((N,), nonneg=True, name='p_old')
+        self.p = cp.Variable((N,),nonneg=True, name='p')
 
         self.sig_old.value = np.zeros((4, N))
         self.deps.value = np.zeros((4, N))
