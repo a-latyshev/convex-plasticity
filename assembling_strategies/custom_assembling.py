@@ -4,7 +4,7 @@ import numpy as np
 
 import ufl
 from dolfinx.jit import ffcx_jit
-from dolfinx import fem, mesh
+from dolfinx import fem, mesh, la
 
 import ctypes
 import ctypes.util
@@ -13,11 +13,13 @@ from mpi4py import MPI
 from petsc4py import get_config as PETSc_get_config
 from petsc4py import PETSc
 
-import typing
+from typing import Optional, List, Dict, Union, Callable
 import basix
 import os 
 
-from dolfinx import la
+import sys
+sys.path.append('../optimisation/')
+import plasticity_framework as pf
 
 from numba.core.errors import NumbaPendingDeprecationWarning
 import warnings
@@ -127,7 +129,7 @@ class DummyFunction(fem.Function): #or ConstantFunction or BasicFunction or Lazy
         values: A vector containing local values on only finite element.
         shape: A shape of the tensor of the function mathematical representation.  
     """
-    def __init__(self, V: fem.FunctionSpace, name: typing.Optional[str] = None):
+    def __init__(self, V: fem.FunctionSpace, name: Optional[str] = None):
         """Inits DummyFunction class."""
         super().__init__(V=V, x=get_dummy_x(V), name=name)
         self.value = self.x.array.reshape((2, -1))[0]
@@ -212,7 +214,7 @@ class CustomFunction(fem.Function): #TODO: CustomExpression
 
         self.global_values[cell][:] = values
 
-    def add_coefficient(self, coeff: typing.Union[DummyFunction, fem.Function], coeff_name:typing.Optional[str] = None):
+    def add_coefficient(self, coeff: Union[DummyFunction, fem.Function], coeff_name:Optional[str] = None):
         """Adds and sorts coefficient of a `CustomFunction`.
             
         It sends the coefficient to `dummies` or `coefficients` according to its type. It creates an attribute of `CustomFunction` under a name of the `coeff` variable or string `coeff_name`.
@@ -265,7 +267,7 @@ def extract_constants(ufl_expression) -> np.ndarray:
     constants_values = np.concatenate([const.value.flatten() for const in constants]) if len(constants) !=0 else np.zeros(0, dtype=PETSc.ScalarType)
     return constants_values
 
-def extract_data(form: ufl.form.Form) -> typing.Union[np.ndarray, list, list, np.ndarray]:
+def extract_data(form: ufl.form.Form) -> Union[np.ndarray, list, list, np.ndarray]:
     """Extracts coefficients and constants of a given form and puts their values all together. 
 
     Args:
@@ -621,7 +623,7 @@ def assemble_ufc_A(A, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_eleme
 # def apply_lifting(A, b, u, geo_dofs, coords, dofmap, num_owned_cells, N_dofs_element,
     #              N_coeffs_values_local_A, coeffs_global_values_A, coeffs_eval_list_A, coeffs_constants_values_A, coeffs_dummies_values_A, coeffs_subcoeffs_values_A, |
 
-def get_topological_dofmap(V:fem.function.FunctionSpace):
+def get_topological_dofmap(V: fem.function.FunctionSpace):
     """Makes a topological dofmap for a vector function space
     Args:
         V: vector function space
@@ -641,7 +643,7 @@ def get_topological_dofmap(V:fem.function.FunctionSpace):
     
     return dofmap_topological
 
-class CustomProblem:
+class CustomProblem(pf.LinearProblem):
     """Class for solving a variational problem via custom assembling approach.
 
     Attributes:
@@ -669,29 +671,22 @@ class CustomProblem:
         solver:
     """
 
-    def __init__(self, 
-                dR: ufl.Form,
-                R: ufl.Form,
-                u: fem.Function,
-                local_assembling_A: numba.core.registry.CPUDispatcher,
-                local_assembling_b: numba.core.registry.CPUDispatcher,
-                bcs: typing.List[fem.dirichletbc] = [],
+    def __init__(
+        self, 
+        dR: ufl.Form,
+        R: ufl.Form,
+        u: fem.Function,
+        local_assembling_A: numba.core.registry.CPUDispatcher,
+        local_assembling_b: numba.core.registry.CPUDispatcher,
+        bcs: List[fem.dirichletbc] = [],
     ):
         """Inits CustomProblem."""
-
-        self.u = u
-        self.bcs = bcs
-        self.bcs_dofs = np.concatenate([bc.dof_indices()[0] for bc in bcs]) if len(bcs) != 0 else np.array([], dtype=PETSc.IntType)
+        super().__init__(dR, R, u, bcs)
 
         V = u.function_space
         domain = V.mesh
 
-        self.R = R
-        self.dR = dR
-        self.b_form = fem.form(R)
-        self.A_form = fem.form(dR)
-        self.b = fem.petsc.create_vector(self.b_form)
-        self.A = fem.petsc.create_matrix(self.A_form)
+        self.bcs_dofs = np.concatenate([bc.dof_indices()[0] for bc in bcs]) if len(bcs) != 0 else np.array([], dtype=PETSc.IntType)
 
         self.local_assembling_A = local_assembling_A
         self.local_assembling_b = local_assembling_b
@@ -704,7 +699,6 @@ class CustomProblem:
         with self.x0.localForm() as x0_local:
             x0_local.set(0.0)
 
-        self.comm = domain.comm
         map_c = domain.topology.index_map(domain.topology.dim)
         self.num_owned_cells = map_c.size_local
         num_cells = self.num_owned_cells + map_c.num_ghosts
@@ -713,14 +707,18 @@ class CustomProblem:
         self.coordinates = domain.geometry.x
 
         #This dofmap takes into account dofs of the vector field
+        #TODO: We would like to avoid the allocation of that map
         self.dofmap_topological = get_topological_dofmap(V)
 
-        self.kernel_A = get_kernel(dR)
-        self.kernel_b = get_kernel(R)
+        self.kernel_A = get_kernel(self.dR)
+        self.kernel_b = get_kernel(self.R)
 
         self.data_extraction()
 
         self.solver = self.solver_setup()
+
+        # if b_additional is not None:
+        #     self.b_additional = b_additional
 
     def data_extraction(self):
         """Extracts coefficients and constants values and a list of `eval` CustomFunction functions of bilinear and linear forms."""
@@ -732,15 +730,7 @@ class CustomProblem:
         self.coeffs_global_values_b, self.coeffs_eval_list_b, self.coeffs_constants_values_b, self.coeffs_dummies_values_b, self.coeffs_subcoeffs_values_b, self.constants_values_b = extract_data(self.R)
         # self.coeffs_global_values_b, self.coeffs_eval_list_b, self.coeffs_constants_values_b, self.coeffs_dummies_values_b, self.coeffs_subcoeffs_values_b, self.constants_values_b = extract_data(self.R)
 
-    def solver_setup(self):
-        """Sets the solver parameters."""
-        solver = PETSc.KSP().create(self.comm)
-        solver.setType("preonly")
-        solver.getPC().setType("lu")
-        solver.setOperators(self.A)
-        return solver
-
-    def assemble_matrix(self):
+    def assemble_matrix(self) -> None:
         """Assembles the matrix A and applies Dirichlet boundary conditions."""
         self.A.zeroEntries()
         assemble_ufc_A(
@@ -752,7 +742,7 @@ class CustomProblem:
         self.A.assemble()
         self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
 
-    def assemble_vector(self, b_additional: typing.Optional[PETSc.Vec] = None):
+    def assemble_vector(self, b_additional: Optional[PETSc.Vec] = None) -> None:
         """Assembles the vector b and adds optionally a global vector `b_additional` to it.
         
         Args:
@@ -768,17 +758,19 @@ class CustomProblem:
             self.kernel_b
         )
 
+        #TODO: How to get better?
         if b_additional is not None:
             self.b.axpy(1, b_additional)
 
         # self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
         # fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
 
-    def assemble(self, 
-                 scale: float = 1.0, 
-                 x0: typing.Optional[np.ndarray] = None, 
-                 b_additional: typing.Optional[PETSc.Vec] = None
-    ):
+    def assemble(
+        self, 
+        scale: float = 1.0, 
+        x0: Optional[np.ndarray] = None, 
+        b_additional: Optional[PETSc.Vec] = None
+    ) -> None:
         """Assembles the hole system and sets up all boundary conditions.
         
         It applies the lifting locally to take into account inhomogeneous Dirichlet boundary conditions as follows:
@@ -819,12 +811,120 @@ class CustomProblem:
 
         fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
 
-    def solve(self, 
-              du: fem.function.Function, 
+class SNESCustomProblem(CustomProblem):
+    """
+    Problem class compatible with PETSC.SNES solvers.
+    """
+
+    def __init__(
+        self,
+        F_form: ufl.Form,
+        u: fem.Function,
+        local_assembling_A: numba.core.registry.CPUDispatcher,
+        local_assembling_b: numba.core.registry.CPUDispatcher,
+        J_form: Optional[ufl.Form] = None,
+        bcs: List[fem.dirichletbc] = [],
+        petsc_options: Dict[str, Union[str, int, float]] = {},
+        prefix: Optional[str] = None,
+        # inside_Newton: Optional[Callable] = None,
+        # logger: Optional[logging.Logger] = None,
+        b_additional: Optional[PETSc.Vec] = None,
     ):
-        """Solves the linear system and saves the solution into the vector `du`
+        # Give PETSc solver options a unique prefix
+        if prefix is None:
+            prefix = "snes_{}".format(str(id(self))[0:4])
+
+        self.prefix = prefix
+        self.petsc_options = petsc_options
+
+        if J_form is None:
+            V = u.function_space
+            J_form = ufl.derivative(F_form, u, ufl.TrialFunction(V))
         
-        Args:
-            du: A global vector to be used as a container for the solution of the linear system
+        super().__init__(J_form, F_form, u, local_assembling_A, local_assembling_b, bcs)
+
+        # if inside_Newton is not None:
+        #     self.inside_Newton = inside_Newton
+        # else:
+        #     def dummy_func():
+        #         pass
+        #     self.inside_Newton = dummy_func
+        
+        # if logger is not None:
+        #     self.logger = logger 
+        # else:
+        #     self.logger = logging.getLogger('SNES_solver')
+
+        self.b_additional = b_additional
+
+                
+    def set_petsc_options(self) -> None:
+        # Set PETSc options
+        opts = PETSc.Options()
+        opts.prefixPush(self.prefix)
+        
+        for k, v in self.petsc_options.items():
+            opts[k] = v
+
+        opts.prefixPop()
+
+    def solver_setup(self) -> PETSc.SNES:
+        # Create nonlinear solver
+        snes = PETSc.SNES().create(self.comm)
+
+        # Set options
+        snes.setOptionsPrefix(self.prefix)
+        self.set_petsc_options()        
+
+        snes.setFunction(self.assemble_vector, self.b)
+        snes.setJacobian(self.assemble_matrix, self.A)
+
+        snes.setFromOptions()
+
+        return snes
+
+    def assemble_vector(self, snes: PETSc.SNES, x: PETSc.Vec, b: PETSc.Vec) -> None:
+        """Assemble the residual F into the vector b.
+
+        Parameters
+        ==========
+        snes: the snes object
+        x: Vector containing the latest solution.
+        b: Vector to assemble the residual into.
         """
-        self.solver.solve(self.b, du.vector)
+        # We need to assign the vector to the function
+
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD) # x_{k+1} = x_k + dx_k, where dx_k = x ?
+        x.copy(self.u.vector) 
+        self.u.x.scatter_forward()
+
+        #TODO: SNES makes the iteration #0, where he calculates the b norm. `inside_Newton()` can be omitted in that case
+        # self.inside_Newton()
+
+        super().assemble_vector(self.b_additional)
+        #WARNING: This solver doesn't support the lifting technique!
+        self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        fem.set_bc(self.b, self.bcs)
+        
+
+    def assemble_matrix(self, snes, x: PETSc.Vec, A: PETSc.Mat, P: PETSc.Mat) -> None:
+        """Assemble the Jacobian matrix.
+
+        Parameters
+        ==========
+        x: Vector containing the latest solution.
+        A: Matrix to assemble the Jacobian into.
+        """
+        super().assemble_matrix()
+
+    def solve(self) -> int:
+    
+        # start = time.time()
+
+        self.solver.solve(None, self.u.vector)
+    
+        # self.logger.debug(f'rank#{MPI.COMM_WORLD.rank}  {self.prefix} SNES solver converged in {self.solver.getIterationNumber()} iterations with converged reason {self.solver.getConvergedReason()})')
+        # self.logger.debug(f'rank#{MPI.COMM_WORLD.rank}  Time (Step) = {time.time() - start:.2f} (s)\n')
+
+        self.u.x.scatter_forward()
+        return self.solver.getIterationNumber() 
