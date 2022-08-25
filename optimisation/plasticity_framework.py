@@ -1,6 +1,3 @@
-
-# from ctypes import Union
-# from yaml import load
 import convex_return_mapping as crm # there is a conflict in the oder of imported modules
 import meshio
 import numpy as np
@@ -261,7 +258,6 @@ class SNESProblem(LinearProblem):
 
         self.u.x.scatter_forward()
         return self.solver.getIterationNumber() 
-   
 
 class AbstractPlasticity():
     def __init__(
@@ -301,6 +297,14 @@ class AbstractPlasticity():
         P0 = fem.FunctionSpace(self.mesh, ("DG", 0))
         self.p_avg = fem.Function(P0, name="Plastic_strain")
 
+        We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
+        W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')        
+        self.W = fem.FunctionSpace(self.mesh, We)
+        self.W0 = fem.FunctionSpace(self.mesh, W0e)
+
+        self.sig = fem.Function(self.W)
+        self.p = fem.Function(self.W0)
+
         left_marker = 3
         down_marker = 1
         left_facets = ft.indices[ft.values == left_marker]
@@ -338,16 +342,16 @@ class AbstractPlasticity():
         else:
             self.logger = logging.getLogger('abstract_plasticity')
 
-    def inside_Newton(self):
+    def inside_Newton(self) -> None:
         pass
 
-    def after_Newton(self):
+    def after_Newton(self) -> None:
         pass
 
-    def initialize_variables(self):
+    def initialize_variables(self) -> None:
         pass
 
-    def solve(self, Nincr: int = 20):
+    def solve(self, Nincr: int = 20) -> tuple[List, np.ndarray, float, fem.function.Function, fem.function.Function, fem.function.Function]:
         load_steps = np.linspace(0, 1.1, Nincr+1)[1:]**0.5
         results = np.zeros((Nincr+1, 2))
         load_steps = load_steps
@@ -356,12 +360,9 @@ class AbstractPlasticity():
 
         self.initialize_variables()
 
-        return_mapping_times = np.zeros((len(load_steps)))
-
         start = time.time()
 
         for (i, t) in enumerate(load_steps):
-            return_mapping_times_tmp = []
             self.loading.value = t * self.q_lim
 
             self.Du.x.array[:] = 0
@@ -384,18 +385,15 @@ class AbstractPlasticity():
             # xdmf.write_function(u, t)
             # xdmf.write_function(p_avg, t)
 
-            # return_mapping_times[i] = np.mean(return_mapping_times_tmp)
-            # print(f'rank#{MPI.COMM_WORLD.rank}: Time (mean return mapping) = {return_mapping_times[i]:.3f} (s)')
-
             if len(self.points_on_proc) > 0:
                 results[i+1, :] = (self.u.eval(self.points_on_proc, self.cells)[0], t)
 
         # xdmf.close()
         # end = time.time()
-        # self.logger.info(f'\n rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {np.mean(return_mapping_times):.3f} (s)')
-        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {time.time() - start:.2f} (s)')
+        total_time = time.time() - start
+        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {total_time:.2f} (s)')
 
-        return self.points_on_proc, results
+        return self.points_on_proc, results, total_time, self.sig, self.p, self.u
 
 class vonMisesPlasticity(AbstractPlasticity):
     def __init__(
@@ -407,14 +405,7 @@ class vonMisesPlasticity(AbstractPlasticity):
     ):
         super().__init__(material, mesh_name, logger)
 
-        We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
-        W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')        
-        W = fem.FunctionSpace(self.mesh, We)
-        W0 = fem.FunctionSpace(self.mesh, W0e)
-
-        self.sig = fem.Function(W)
-        self.p = fem.Function(W0)
-        self.dp = fem.Function(W0) 
+        self.dp = fem.Function(self.W0) 
 
         mu_ = material.constitutive_law.mu_
         lambda_ = material.constitutive_law.lambda_
@@ -424,9 +415,9 @@ class vonMisesPlasticity(AbstractPlasticity):
         self.proj_sig = lambda deps, old_sig, old_p: uf.proj_sig_vonMises(deps, old_sig, old_p, lambda_, mu_, sig0, H)
         
         if solver == 'nonlinear':
-            self.sig_old = fem.Function(W)
-            self.n_elas = fem.Function(W)
-            self.beta = fem.Function(W0)
+            self.sig_old = fem.Function(self.W)
+            self.n_elas = fem.Function(self.W)
+            self.beta = fem.Function(self.W0)
      
             sigma_tang = lambda e: uf.sigma_tang_vonMises(e, self.n_elas, self.beta, lambda_, mu_, H)
 
@@ -528,14 +519,7 @@ class DruckerPragerPlasticity(AbstractPlasticity):
     ):
         super().__init__(material, mesh_name, logger)
 
-        We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
-        W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')        
-        W = fem.FunctionSpace(self.mesh, We)
-        W0 = fem.FunctionSpace(self.mesh, W0e)
-
-        self.sig = fem.Function(W)
-        self.p = fem.Function(W0)
-        self.dp = fem.Function(W0) 
+        self.dp = fem.Function(self.W0) 
 
         mu_ = material.constitutive_law.mu_
         lambda_ = material.constitutive_law.lambda_
@@ -653,17 +637,10 @@ class ConvexPlasticity(AbstractPlasticity):
     ):
         super().__init__(material, mesh_name, logger)
 
-        We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
-        W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')
-        
-        W = fem.FunctionSpace(self.mesh, We)
-        W0 = fem.FunctionSpace(self.mesh, W0e)
-
-        self.sig = fem.Function(W)
-        self.sig_old = fem.Function(W)
-        self.p = fem.Function(W0, name="Cumulative_plastic_strain")
-        self.p_old = fem.Function(W0) 
-        self.deps = fem.Function(W, name="deps")
+        self.sig_old = fem.Function(self.W)
+        self.p_old = fem.Function(self.W0) 
+        self.deps = fem.Function(self.W, name="deps")
+        tol_convex = 1e-13
         
         deps_Voigt = uf.eps_Voigt(self.Du)
         sigma = lambda eps: uf.sigma(eps, lambda_, mu_)
@@ -672,11 +649,9 @@ class ConvexPlasticity(AbstractPlasticity):
         if isinstance(material.yield_criterion, crm.DruckerPrager):
             mu_ = material.constitutive_law.mu_
             lambda_ = material.constitutive_law.lambda_
-            k = lambda_ + 2*mu_/3 # Bulk modulus 
             sig0 = material.yield_criterion.sig0
             H = material.yield_criterion.H
             alpha = material.yield_criterion.alpha
-            M = (3*mu_ + 9*alpha*alpha*k) + H
 
             deps_p = lambda deps, old_sig, p, old_p: uf.deps_p_convex(deps, old_sig, p, old_p, lambda_, mu_, sig0, H, alpha)
         else:
@@ -706,7 +681,6 @@ class ConvexPlasticity(AbstractPlasticity):
 
         if solver == 'nonlinear':
             def inside_Newton():
-                tol = 1e-13
                 start_return_mapping = time.time()
 
                 fs.interpolate_quadrature(deps_Voigt, self.deps) # eps_xy * sqrt(2.)!
@@ -715,7 +689,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
                     self.return_mapping.p_old.value = self.p_old_values[q,:]
                     
-                    self.return_mapping.solve(derivation=True, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol)
+                    self.return_mapping.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
 
                     self.sig_values[q,:] = self.return_mapping.sig.value[:].T
                     self.p_values[q,:] = self.return_mapping.p.value
@@ -726,7 +700,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
                     self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
                     
-                    self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol)
+                    self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
                     
                     self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
                     self.p_values_residue[0,:] = self.return_mapping_residue.p.value
@@ -759,7 +733,6 @@ class ConvexPlasticity(AbstractPlasticity):
 
         elif solver == 'SNES' or solver == 'SNESQN':
             def inside_Newton():
-                tol = 1e-8
                 start_return_mapping = time.time()
                 
                 fs.interpolate_quadrature(deps_Voigt, self.deps) # eps_xy * sqrt(2.)!
@@ -768,7 +741,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
                     self.return_mapping.p_old.value = self.p_old_values[q,:]
                     
-                    self.return_mapping.solve(derivation=False, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol)
+                    self.return_mapping.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
                     self.sig_values[q,:] = self.return_mapping.sig.value[:].T
                     self.p_values[q,:] = self.return_mapping.p.value
 
@@ -777,7 +750,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
                     self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
                     
-                    self.return_mapping_residue.solve(derivation=False, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol)
+                    self.return_mapping_residue.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
                     self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
                     self.p_values_residue[0,:] = self.return_mapping_residue.p.value
 
@@ -818,7 +791,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     "snes_qn_m": 100,
                     "snes_qn_scale_type": "jacobian", #<diagonal,none,scalar,jacobian> 	
                     "snes_qn_restart_type": "none", #<powell,periodic,none> 
-                    "pc_type": "cholesky", # cholesky >> hypre > gamg,sor ; asm, lu, gas - don't work
+                    "pc_type": "cholesky", # cholesky >> hypre > gamg, sor ; asm, lu, gas - don't work
                     "snes_linesearch_type": "basic",
                     "ksp_type": "preonly",
                     "pc_factor_mat_solver_type": "mumps",
@@ -836,109 +809,3 @@ class ConvexPlasticity(AbstractPlasticity):
     def after_Newton(self):
         self.p_old.x.array[:] = self.p.x.array        
         self.sig_old.x.array[:] = self.sig.x.array
-
-# class ConvexPlasticitySNES(ConvexPlasticity):
-#     def __init__(self, material: crm.Material, patch_size: int = 1, mesh_name: str = "thick_cylinder.msh", logger: logging.Logger = logging.getLogger()):
-#         super().__init__(material, mesh_name, logger)
-
-#         We = ufl.VectorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, dim=4, quad_scheme='default')
-#         W0e = ufl.FiniteElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, quad_scheme='default')
-#         WTe = ufl.TensorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, shape=(4, 4), quad_scheme='default')
-        
-#         W = fem.FunctionSpace(self.mesh, We)
-#         W0 = fem.FunctionSpace(self.mesh, W0e)
-#         WT = fem.FunctionSpace(self.mesh, WTe)
-
-#         self.sig = fem.Function(W)
-#         self.sig_old = fem.Function(W)
-#         self.p = fem.Function(W0, name="Cumulative_plastic_strain")
-#         self.p_old = fem.Function(W0) 
-
-#         self.C_tang = fem.Function(WT)
-#         self.deps = fem.Function(W, name="deps")
-        
-#         def eps_vec(v):
-#             e = ufl.sym(ufl.grad(v))
-#             return ufl.as_vector([e[0, 0], e[1, 1], 0, SQRT2 * e[0, 1]])
-
-#         def as_3D_tensor(X):
-#             return ufl.as_tensor([[X[0], X[3] / SQRT2, 0],
-#                                 [X[3] / SQRT2, X[1], 0],
-#                                 [0, 0, X[2]]])       
-
-#         self.eps_vec = eps_vec
-
-#         self.n_quadrature_points = len(self.C_tang.x.array.reshape((-1, 4, 4)))
-#         for i in range(self.n_quadrature_points):
-#             self.C_tang.x.array.reshape((-1, 4, 4))[i,:,:] = material.C
-
-#         self.N_patches = int(self.n_quadrature_points / patch_size)
-#         self.residue_size = self.n_quadrature_points % patch_size
-
-#         self.return_mapping = crm.ReturnMapping(material, patch_size)
-#         self.material = material
-
-#         self.p_values = self.p.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
-#         self.p_old_values = self.p_old.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
-#         self.deps_values = self.deps.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
-#         self.sig_values = self.sig.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
-#         self.sig_old_values = self.sig_old.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
-#         self.C_tang_values = self.C_tang.x.array[:4*4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4, 4))
-
-#         if self.residue_size != 0:
-#             self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size)
-            
-#             self.p_values_residue = self.p.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
-#             self.p_old_values_residue = self.p_old.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
-#             self.deps_values_residue = self.deps.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
-#             self.sig_values_residue = self.sig.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
-#             self.sig_old_values_residue = self.sig_old.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
-#             self.C_tang_values_residue = self.C_tang.x.array[4*4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4, 4))
-
-#         a_Newton = ufl.inner(eps_vec(self.v_), ufl.dot(self.C_tang, eps_vec(self.u_)))*self.dx 
-#         res = -ufl.inner(self.eps(self.u_), as_3D_tensor(self.sig))*self.dx + self.F_ext(self.u_)
-
-#         self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs)
-
-#         residual = ufl.inner(as_3D_tensor(self.sig) + sigma(self.eps(self.Du) - deps_p(self.eps(self.Du), self.sig, self.p)), self.eps(self.u_))*self.dx - self.F_ext(self.u_)
-
-#         petsc_options = {
-#             "snes_type": "vinewtonrsls",
-#             "snes_linesearch_type": "basic",
-#             "ksp_type": "preonly",
-#             "pc_type": "lu",
-#             "pc_factor_mat_solver_type": "mumps",
-#             "snes_atol": 1.0e-08,
-#             "snes_rtol": 1.0e-09,
-#             "snes_stol": 0.0,
-#             "snes_max_it": 500,
-#             "snes_monitor_cancel": "",
-#         }
-
-#         self.problem = SNESProblem(residual, self.Du, self.bcs, petsc_options = petsc_options)
-
-
-#     def inside_Newton(self):
-#         tol = 1e-13
-#         fs.interpolate_quadrature(self.eps_vec(self.Du), self.deps) # eps_xy * sqrt(2.)!
-#         for q in range(self.N_patches):
-#             self.return_mapping.deps.value[:] = self.deps_values[q,:].T
-#             self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
-#             self.return_mapping.p_old.value = self.p_old_values[q,:]
-            
-#             self.return_mapping.solve(derivation=True, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol) #, alpha=1, scale=5.
-
-#             self.sig_values[q,:] = self.return_mapping.sig.value[:].T
-#             self.p_values[q,:] = self.return_mapping.p.value
-#             self.C_tang_values[q,:] = self.return_mapping.C_tang[:]
-
-#         if self.residue_size != 0: #how to improve ?
-#             self.return_mapping_residue.deps.value[:] = self.deps_values_residue[0,:].T
-#             self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
-#             self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
-            
-#             self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol, eps_abs=tol, eps_rel=tol) #, alpha=1, scale=5.
-            
-#             self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
-#             self.p_values_residue[0,:] = self.return_mapping_residue.p.value
-#             self.C_tang_values_residue[0,:] = self.return_mapping_residue.C_tang[:]
