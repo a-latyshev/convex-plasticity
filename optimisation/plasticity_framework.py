@@ -643,6 +643,191 @@ class ConvexPlasticity(AbstractPlasticity):
         tol_convex = 1e-13
         
         deps_Voigt = uf.eps_Voigt(self.Du)
+        mu_ = material.constitutive_law.mu_
+        lambda_ = material.constitutive_law.lambda_
+        sigma = lambda eps: uf.sigma(eps, lambda_, mu_)
+        
+        # deps_p = None
+        
+        # if isinstance(material.yield_criterion, crm.DruckerPrager):
+        #     sig0 = material.yield_criterion.sig0
+        #     H = material.yield_criterion.H
+        #     alpha = material.yield_criterion.alpha
+
+        #     deps_p = lambda deps, old_sig, p, old_p: uf.deps_p_convex(deps, old_sig, p, old_p, lambda_, mu_, sig0, H, alpha)
+        # else:
+        #     raise RuntimeError(f"Convex plasticity supports Drucker-Prager materials, chose another one.")
+
+        self.n_quadrature_points = len(self.p.x.array)
+        self.N_patches = int(self.n_quadrature_points / patch_size)
+        self.residue_size = self.n_quadrature_points % patch_size
+
+        self.return_mapping = crm.ReturnMapping(material, patch_size)
+        self.material = material
+
+        self.p_values = self.p.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
+        self.p_old_values = self.p_old.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
+        self.deps_values = self.deps.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
+        self.sig_values = self.sig.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
+        self.sig_old_values = self.sig_old.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
+
+        if self.residue_size != 0:
+            self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size)
+            
+            self.p_values_residue = self.p.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
+            self.p_old_values_residue = self.p_old.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
+            self.deps_values_residue = self.deps.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
+            self.sig_values_residue = self.sig.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
+            self.sig_old_values_residue = self.sig_old.x.array[4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4))
+
+        if solver == 'nonlinear':
+            def inside_Newton():
+                start_return_mapping = time.time()
+
+                fs.interpolate_quadrature(deps_Voigt, self.deps) # eps_xy * sqrt(2.)!
+                for q in range(self.N_patches):
+                    self.return_mapping.deps.value[:] = self.deps_values[q,:].T
+                    self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
+                    self.return_mapping.p_old.value = self.p_old_values[q,:]
+                    
+                    self.return_mapping.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+
+                    self.sig_values[q,:] = self.return_mapping.sig.value[:].T
+                    self.p_values[q,:] = self.return_mapping.p.value
+                    self.C_tang_values[q,:] = self.return_mapping.C_tang[:]
+
+                if self.residue_size != 0: #how to improve ?
+                    self.return_mapping_residue.deps.value[:] = self.deps_values_residue[0,:].T
+                    self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
+                    self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
+                    
+                    self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    
+                    self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
+                    self.p_values_residue[0,:] = self.return_mapping_residue.p.value
+                    self.C_tang_values_residue[0,:] = self.return_mapping_residue.C_tang[:]
+
+                self.logger.debug(f'rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {time.time() - start_return_mapping:.2f} (s)')
+                
+            self.inside_Newton = inside_Newton
+
+            def initialize_variables():
+                self.sig.vector.set(0.0)
+                self.sig_old.vector.set(0.0)
+                self.p.vector.set(0.0)
+                self.p_old.vector.set(0.0)
+                self.u.vector.set(0.0)
+                for i in range(self.n_quadrature_points):
+                    self.C_tang.x.array.reshape((-1, 4, 4))[i,:,:] = self.material.C
+            self.initialize_variables = initialize_variables
+
+            WTe = ufl.TensorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, shape=(4, 4), quad_scheme='default')
+            WT = fem.FunctionSpace(self.mesh, WTe)
+            self.C_tang = fem.Function(WT)
+            self.C_tang_values = self.C_tang.x.array[:4*4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4, 4))
+            if self.residue_size != 0:
+                self.C_tang_values_residue = self.C_tang.x.array[4*4*(self.n_quadrature_points - self.residue_size):].reshape((1, self.residue_size, 4, 4))
+
+            a_Newton = ufl.inner(uf.eps_Voigt(self.v_), ufl.dot(self.C_tang, uf.eps_Voigt(self.u_)))*self.dx 
+            res = -ufl.inner(uf.eps(self.u_), uf.as_3D_tensor_Voigt(self.sig))*self.dx + self.F_ext(self.u_)
+            self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs, Nitermax=200, tol=1e-8, inside_Newton=self.inside_Newton, logger=self.logger)
+
+        elif solver == 'SNESQN':
+            def inside_Newton():
+                start_return_mapping = time.time()
+                
+                fs.interpolate_quadrature(deps_Voigt, self.deps) # eps_xy * sqrt(2.)!
+                for q in range(self.N_patches):
+                    self.return_mapping.deps.value[:] = self.deps_values[q,:].T
+                    self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
+                    self.return_mapping.p_old.value = self.p_old_values[q,:]
+                    
+                    self.return_mapping.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.sig_values[q,:] = self.return_mapping.sig.value[:].T
+                    self.p_values[q,:] = self.return_mapping.p.value
+
+                if self.residue_size != 0: #how to improve ?
+                    self.return_mapping_residue.deps.value[:] = self.deps_values_residue[0,:].T
+                    self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
+                    self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
+                    
+                    self.return_mapping_residue.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
+                    self.p_values_residue[0,:] = self.return_mapping_residue.p.value
+
+                self.logger.debug(f'rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {time.time() - start_return_mapping:.2f} (s)')
+                
+            self.inside_Newton = inside_Newton
+
+            def initialize_variables():
+                self.sig.vector.set(0.0)
+                self.sig_old.vector.set(0.0)
+                self.p.vector.set(0.0)
+                self.p_old.vector.set(0.0)
+                self.u.vector.set(0.0)
+            self.initialize_variables = initialize_variables
+
+            residual = ufl.inner(uf.as_3D_tensor_Voigt(self.sig), uf.eps(self.u_))*self.dx - self.F_ext(self.u_)
+            J = ufl.derivative(ufl.inner(sigma(uf.eps(self.Du)), uf.eps(self.u_))*self.dx, self.Du, self.v_)
+
+            petsc_options = {}
+            if solver == 'SNES':
+                petsc_options = {
+                    "snes_type": "vinewtonrsls",
+                    "snes_linesearch_type": "basic",
+                    "ksp_type": "preonly",
+                    "pc_type": "lu",
+                    "pc_factor_mat_solver_type": "mumps",
+                    "snes_atol": 1.0e-08,
+                    "snes_rtol": 1.0e-08,
+                    "snes_stol": 0.0,
+                    "snes_max_it": 500,
+                    # "snes_monitor": "",
+                    "snes_monitor_cancel": "",
+                }
+            else:
+                petsc_options = {
+                    "snes_type": "qn",
+                    "snes_qn_type": "lbfgs", #lbfgs broyden, badbroyden
+                    "snes_qn_m": 100,
+                    "snes_qn_scale_type": "jacobian", #<diagonal,none,scalar,jacobian> 	
+                    "snes_qn_restart_type": "none", #<powell,periodic,none> 
+                    "pc_type": "cholesky", # cholesky >> hypre > gamg, sor ; asm, lu, gas - don't work
+                    "snes_linesearch_type": "basic",
+                    "ksp_type": "preonly",
+                    "pc_factor_mat_solver_type": "mumps",
+                    "snes_atol": 1.0e-08,
+                    "snes_rtol": 1.0e-08,
+                    "snes_stol": 0.0,
+                    "snes_max_it": 500,
+                    # "snes_monitor": "",
+                    "snes_monitor_cancel": "",
+                }
+            self.problem = SNESProblem(residual, self.Du, J, self.bcs, petsc_options=petsc_options, inside_Newton=self.inside_Newton, logger=self.logger)
+        else:
+            raise RuntimeError(f"Solver {solver} doesn't support!")
+
+    def after_Newton(self):
+        self.p_old.x.array[:] = self.p.x.array        
+        self.sig_old.x.array[:] = self.sig.x.array
+
+class ConvexAnalyticalPlasticity(AbstractPlasticity):
+    def __init__(
+        self, 
+        material: crm.Material, 
+        patch_size: int = 1, 
+        mesh_name: str = "thick_cylinder.msh", 
+        logger: Optional[logging.Logger] = None,
+        solver: str = "nonlinear",
+    ):
+        super().__init__(material, mesh_name, logger)
+
+        self.sig_old = fem.Function(self.W)
+        self.p_old = fem.Function(self.W0) 
+        self.deps = fem.Function(self.W, name="deps")
+        tol_convex = 1e-13
+        
+        deps_Voigt = uf.eps_Voigt(self.Du)
         sigma = lambda eps: uf.sigma(eps, lambda_, mu_)
         deps_p = None
         

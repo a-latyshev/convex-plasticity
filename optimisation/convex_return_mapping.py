@@ -74,7 +74,7 @@ class vonMises(YieldCriterion):
 class DruckerPrager(YieldCriterion):
     def __init__(self, sigma0: np.float64, alpha: np.float64, hardening: np.float64):
         self.sig0 = sigma0
-        self.alpha = alpha # alpha = tg(phi), phi - l'angle de frottement
+        self.alpha = alpha 
         self.H = hardening
 
     def criterion(self, sig: cp.expressions.variable.Variable, p: cp.expressions.variable.Variable):
@@ -92,15 +92,27 @@ class DruckerPrager(YieldCriterion):
     
 
 class Rankine(YieldCriterion):
-    def __init__(self):
-        self.fc = cp.Parameter()
-        self.ft = cp.Parameter()
+    def __init__(self, ft: np.float64, fc: np.float64, hardening: np.float64):
+        self.fc = ft
+        self.ft = fc
+        self.H = hardening
 
-    def criterion(self, sig: cp.expressions.variable.Variable):
-        Sig = cp.bmat([[sig[0], sig[3]/np.sqrt(2), 0],
-                      [sig[3]/np.sqrt(2), sig[1], 0],
-                      [0, 0, sig[2]]])
-        return [cp.lambda_max(Sig) <= self.ft, cp.lambda_min(Sig) >= -self.fc]
+    def criterion(self, sig: cp.expressions.variable.Variable, p: cp.expressions.variable.Variable):
+        N = p.size
+
+        ft = np.repeat(self.ft, N)
+        fc = np.repeat(self.fc, N)
+
+        sigma_max = []
+        sigma_min = []
+        for i in range(N):
+            SIG = cp.bmat([[sig[0,i], sig[3,i]/np.sqrt(2), 0],
+                           [sig[3,i]/np.sqrt(2), sig[1,i], 0],
+                           [0, 0, sig[2,i]]])
+            sigma_max.append(cp.lambda_max(SIG))
+            sigma_min.append(cp.lambda_min(SIG))
+
+        return [cp.hstack(sigma_max) <= ft + p * self.H, cp.hstack(sigma_min) >= -fc - p * self.H]
 
 
 class IsotropicElasticity:
@@ -176,6 +188,7 @@ class ReturnMapping:
         self.p = cp.Variable((N,),nonneg=True, name='p')
 
         self.sig_old.value = np.zeros((4, N))
+        # self.sig.value = np.zeros((4, N))
         self.deps.value = np.zeros((4, N))
         self.p_old.value = np.zeros((N,))
         self.C_tang = np.zeros((N, 4, 4))
