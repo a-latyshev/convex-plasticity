@@ -16,10 +16,13 @@ from petsc4py import PETSc
 from typing import Optional, List, Dict, Union, Callable
 import basix
 import os 
+import logging
 
 import sys
 sys.path.append('../optimisation/')
 import plasticity_framework as pf
+import convex_return_mapping as crm
+import utility_functions as uf
 
 from numba.core.errors import NumbaPendingDeprecationWarning
 import warnings
@@ -679,6 +682,11 @@ class CustomProblem(pf.LinearProblem):
         local_assembling_A: numba.core.registry.CPUDispatcher,
         local_assembling_b: numba.core.registry.CPUDispatcher,
         bcs: List[fem.dirichletbc] = [],
+        res_Neumann: Optional[ufl.form.Form] = None, 
+        Nitermax: int = 200, 
+        tol: float = 1e-8,
+        # inside_Newton: Optional[Callable] = None,
+        logger: Optional[logging.Logger] = None,
     ):
         """Inits CustomProblem."""
         super().__init__(dR, R, u, bcs)
@@ -717,8 +725,29 @@ class CustomProblem(pf.LinearProblem):
 
         self.solver = self.solver_setup()
 
-        # if b_additional is not None:
-        #     self.b_additional = b_additional
+        if res_Neumann is not None:
+            self.form_res_Neumann = fem.form(res_Neumann)
+            self.b_Neumann = fem.petsc.create_vector(self.form_res_Neumann)
+        else:
+            self.form_res_Neumann = None
+            self.b_Neumann = None
+
+        self.Nitermax = Nitermax
+        self.tol = tol
+        self.du = fem.Function(self.u.function_space)
+
+        # if inside_Newton is not None:
+        #     self.inside_Newton = inside_Newton
+        # else:
+        #     def dummy_func():
+        #         pass
+        #     self.inside_Newton = dummy_func
+        if logger is not None:
+            self.logger = logger 
+        else:
+            self.logger = logging.getLogger('custom_solver')
+
+        self.assemble_matrix()
 
     def data_extraction(self):
         """Extracts coefficients and constants values and a list of `eval` CustomFunction functions of bilinear and linear forms."""
@@ -729,6 +758,11 @@ class CustomProblem(pf.LinearProblem):
 
         self.coeffs_global_values_b, self.coeffs_eval_list_b, self.coeffs_constants_values_b, self.coeffs_dummies_values_b, self.coeffs_subcoeffs_values_b, self.constants_values_b = extract_data(self.R)
         # self.coeffs_global_values_b, self.coeffs_eval_list_b, self.coeffs_constants_values_b, self.coeffs_dummies_values_b, self.coeffs_subcoeffs_values_b, self.constants_values_b = extract_data(self.R)
+
+    def assemble_Neumann(self) -> None:
+        with self.b_Neumann.localForm() as b_local:
+            b_local.set(0.0)
+        fem.petsc.assemble_vector(self.b_Neumann, self.form_res_Neumann)
 
     def assemble_matrix(self) -> None:
         """Assembles the matrix A and applies Dirichlet boundary conditions."""
@@ -742,7 +776,11 @@ class CustomProblem(pf.LinearProblem):
         self.A.assemble()
         self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
 
-    def assemble_vector(self, b_additional: Optional[PETSc.Vec] = None) -> None:
+    def assemble_vector(self, 
+        scale: float = 1.0, 
+        x0: Optional[np.ndarray] = None, 
+        # b_additional: Optional[PETSc.Vec] = None
+    ) -> None:
         """Assembles the vector b and adds optionally a global vector `b_additional` to it.
         
         Args:
@@ -759,17 +797,17 @@ class CustomProblem(pf.LinearProblem):
         )
 
         #TODO: How to get better?
-        if b_additional is not None:
-            self.b.axpy(1, b_additional)
+        if self.b_Neumann is not None:
+            self.b.axpy(1, self.b_Neumann)
 
-        # self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-        # fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
+        self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
 
     def assemble(
         self, 
         scale: float = 1.0, 
         x0: Optional[np.ndarray] = None, 
-        b_additional: Optional[PETSc.Vec] = None
+        # b_additional: Optional[PETSc.Vec] = None
     ) -> None:
         """Assembles the hole system and sets up all boundary conditions.
         
@@ -804,12 +842,45 @@ class CustomProblem(pf.LinearProblem):
         self.A.assemble()
         self.A.zeroRowsColumnsLocal(self.bcs_dofs, 1.)
 
-        if b_additional is not None:
-            self.b.axpy(1, b_additional)
+        if self.b_Neumann is not None:
+            # #TODO: It will be called on every
+            # self.assemble_Neumann()
+            self.b.axpy(1, self.b_Neumann)
 
         self.b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
         fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
+
+    def solve(self) -> int:
+        """Solves the linear system and saves the solution into the vector `du`
+        
+        Args:
+            du: A global vector to be used as a container for the solution of the linear system
+        """
+        self.assemble_Neumann()
+        self.assemble_vector()
+    
+        nRes0 = self.b.norm()
+        nRes = nRes0
+        niter = 0
+
+        # if MPI.COMM_WORLD.rank == 0:
+        #     print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {loading.value}")
+     
+        while nRes/nRes0 > self.tol and niter < self.Nitermax:
+            self.solver.solve(self.b, self.du.vector)
+
+            self.u.vector.axpy(1, self.du.vector) # Du = Du + 1*du
+            self.u.x.scatter_forward() 
+
+            self.assemble()
+            
+            nRes = self.b.norm() 
+            if MPI.COMM_WORLD.rank == 0:
+                print(f"    Residual: {nRes}")
+            niter += 1
+        
+        return niter
 
 class SNESCustomProblem(CustomProblem):
     """
@@ -928,3 +999,191 @@ class SNESCustomProblem(CustomProblem):
 
         self.u.x.scatter_forward()
         return self.solver.getIterationNumber() 
+
+class CustomPlasticity(pf.AbstractPlasticity):
+    def __init__(
+        self, 
+        material: crm.Material, 
+        mesh_name: str = "thick_cylinder.msh", 
+        logger: Optional[logging.Logger] = None,
+        solver: str = "nonlinear",
+    ):
+        if not isinstance(material.yield_criterion, crm.vonMises):
+            raise RuntimeError(f"Custom plasticity supports only Drucker-Prager material.")
+        if solver != 'nonlinear':
+            raise RuntimeError(f"Custom plasticity supports only nonlinear solver.")
+
+        sig0 = material.yield_criterion.sig0
+        mu_ = material.constitutive_law.mu_
+        lambda_ = material.constitutive_law.lambda_
+        H = material.yield_criterion.H
+        
+        super().__init__(sig0, mesh_name, logger)
+
+        TPV = np.finfo(PETSc.ScalarType).eps # très petite value 
+        I = np.eye(3)
+        J4 = 1./3. * np.tensordot(I, I, axes=0)
+        I4 = np.einsum('ij,kl->ikjl', I, I)
+        K4 = DEV = I4 - J4
+        C_elas = (3*lambda_ + 2*mu_)*J4 + 2*mu_*K4
+        # C_elas_const = fem.Constant(mesh, C_elas.astype(np.dtype(PETSc.ScalarType)))
+
+        QTe = ufl.TensorElement("Quadrature", self.mesh.ufl_cell(), degree=self.deg_stress, shape=C_elas.shape, quad_scheme='default') #, symmetry=True?
+        QT = fem.FunctionSpace(self.mesh, QTe)
+
+        self.C_tang = DummyFunction(QT, name='tangent') # 2 * n_gauss_points * 3 * 3 * 3 * 3
+
+        @numba.njit(fastmath=True)
+        def as_3D_array(X):
+            return np.asarray([[X[0], X[3], 0],
+                            [X[3], X[1], 0],
+                            [0, 0, X[2]]])
+                            
+        @numba.njit(fastmath=True)
+        def ppos(x):
+            return (x + np.sqrt(x**2))/2.
+
+        @numba.njit(fastmath=True)
+        def sigma(eps_el):
+            return lambda_*np.trace(eps_el)*I + 2*mu_*eps_el
+
+        @numba.njit(fastmath=True)
+        def tensor_product(A, B):
+            # n_i, n_j = A.shape
+            # n_k, n_l = B.shape
+            C = np.zeros((*A.shape, *B.shape), dtype=PETSc.ScalarType)
+            for i in range(3):
+                for j in range(3):
+                    for k in range(3):
+                        for l in range(3):
+                            C[i,j,k,l] = A[i,j] * B[k,l]
+            return C
+                            
+        @numba.njit(fastmath=True)
+        def get_C_tang(beta, n_elas):
+            return C_elas - 3*mu_*(3*mu_/(3*mu_+H)-beta)*tensor_product(n_elas, n_elas) - 2*mu_*beta*DEV 
+
+        @numba.njit(fastmath=True)
+        def inner(A, B):
+            return np.sum(A * B)
+
+        def inner_product(C, epsilon):
+            i, j, k, l = ufl.indices(4)
+            return ufl.as_tensor( (C[i,j,k,l] * epsilon[k,l]), (i,j) )
+        
+        def get_eval(self: CustomFunction):
+            tabulated_eps = self.tabulated_input_expression
+            n_gauss_points = len(self.input_expression.X)
+            local_shape = self.local_shape
+            C_tang_shape = self.tangent.shape
+
+            @numba.njit(fastmath=True)
+            def eval(sigma_current_local, sigma_old_local, p_old_local, dp_local, coeffs_values, constants_values, coordinates, local_index, orientation):
+                deps_local = np.zeros(n_gauss_points*3*3, dtype=PETSc.ScalarType)
+                
+                C_tang_local = np.zeros((n_gauss_points, *C_tang_shape), dtype=PETSc.ScalarType)
+                
+                sigma_old = sigma_old_local.reshape((n_gauss_points, *local_shape))
+                sigma_new = sigma_current_local.reshape((n_gauss_points, *local_shape))
+
+                tabulated_eps(ffi.from_buffer(deps_local), 
+                            ffi.from_buffer(coeffs_values), 
+                            ffi.from_buffer(constants_values), 
+                            ffi.from_buffer(coordinates), ffi.from_buffer(local_index), ffi.from_buffer(orientation))
+                
+                deps_local = deps_local.reshape((n_gauss_points, 3, 3))
+
+                n_elas = np.zeros((3, 3), dtype=PETSc.ScalarType) 
+                beta = np.zeros(1, dtype=PETSc.ScalarType) 
+                dp = np.zeros(1, dtype=PETSc.ScalarType) 
+
+                for q in range(n_gauss_points):
+                    sig_n = as_3D_array(sigma_old[q])
+                    sig_elas = sig_n + sigma(deps_local[q])
+                    s = sig_elas - np.trace(sig_elas)*I/3.
+                    sig_eq = np.sqrt(3./2. * inner(s, s))
+                    f_elas = sig_eq - sig0 - H*p_old_local[q]
+                    f_elas_plus = ppos(f_elas)
+                    dp[:] = f_elas_plus/(3*mu_+H)
+                    
+                    sig_eq += TPV # for the case when sig_eq is equal to 0.0
+                    n_elas[:,:] = s/sig_eq*f_elas_plus/f_elas
+                    beta[:] = 3*mu_*dp/sig_eq
+            
+                    new_sig = sig_elas - beta*s
+                    sigma_new[q][:] = np.asarray([new_sig[0, 0], new_sig[1, 1], new_sig[2, 2], new_sig[0, 1]])
+                    dp_local[q] = dp[0]
+                    
+                    C_tang_local[q][:] = get_C_tang(beta, n_elas)
+                
+                return [C_tang_local.flatten()] 
+            return eval
+
+        @numba.njit(fastmath=True)
+        def local_assembling_b(cell, geometry, entity_local_index, perm, u_local,
+                        coeffs_global_values_A, coeffs_eval_list_A, coeffs_constants_values_A, coeffs_dummies_values_A, coeffs_subcoeffs_values_A, 
+                        coeffs_global_values_b, coeffs_eval_list_b, coeffs_constants_values_b, coeffs_dummies_values_b, coeffs_subcoeffs_values_b):
+            sigma_local = coeffs_global_values_b[0][cell]
+            p_local = coeffs_subcoeffs_values_b[0][cell]
+            dp_local = coeffs_subcoeffs_values_b[1][cell]
+            sigma_old_local = coeffs_subcoeffs_values_b[2][cell]
+
+            output_values = coeffs_eval_list_b[0](sigma_local, 
+                                            sigma_old_local,
+                                            p_local,
+                                            dp_local,
+                                            u_local, 
+                                            coeffs_constants_values_b[0], 
+                                            geometry, entity_local_index, perm)
+
+            coeffs_b = sigma_local
+
+            for i in range(len(coeffs_dummies_values_b)):
+                coeffs_dummies_values_b[i][:] = output_values[i] #C_tang update
+
+            return coeffs_b
+
+        @numba.njit(fastmath=True)
+        def local_assembling_A(cell, geometry, entity_local_index, perm, u_local,
+                        coeffs_global_values_A, coeffs_eval_list_A, coeffs_constants_values_A, coeffs_dummies_values_A, coeffs_subcoeffs_values_A, 
+                        coeffs_global_values_b, coeffs_eval_list_b, coeffs_constants_values_b, coeffs_dummies_values_b, coeffs_subcoeffs_values_b):
+            coeffs_A = coeffs_dummies_values_b[0]
+            return coeffs_A
+        
+        self.dp = fem.Function(self.W0)  
+        self.sig_old = fem.Function(self.W)
+        
+        self.sig = CustomFunction(self.W, uf.eps(self.Du), [self.C_tang, self.p, self.dp, self.sig_old], get_eval)
+
+        a_Newton = ufl.inner(uf.eps(self.v_), inner_product(self.sig.tangent, uf.eps(self.u_)))*self.dx
+        res = -ufl.inner(uf.eps(self.u_), uf.as_3D_tensor(self.sig))*self.dx 
+        res_Neumann = self.F_ext(self.u_)
+
+        self.problem = CustomProblem(a_Newton, res, self.Du, local_assembling_A, local_assembling_b, self.bcs, res_Neumann=res_Neumann, Nitermax=200, tol=1e-8, logger=self.logger)
+
+        # def inside_Newton():
+        #     deps = uf.eps(self.Du)
+        #     sig_, n_elas_, beta_, self.dp_ = self.proj_sig(deps, self.sig_old, self.p)
+        #     fs.interpolate_quadrature(sig_, self.sig)
+        #     fs.interpolate_quadrature(n_elas_, self.n_elas)
+        #     fs.interpolate_quadrature(beta_, self.beta)
+        # self.inside_Newton = inside_Newton
+
+        def after_Newton():
+            self.sig_old.x.array[:] = self.sig.x.array[:]
+            self.p.vector.axpy(1, self.dp.vector)
+            self.p.x.scatter_forward()
+        self.after_Newton = after_Newton
+
+        def initialize_variables():
+            self.sig.vector.set(0.0)
+            self.sig_old.vector.set(0.0)
+            self.p.vector.set(0.0)
+            self.dp.vector.set(0.0)
+            self.u.vector.set(0.0)
+        self.initialize_variables = initialize_variables 
+
+        # a_Newton = ufl.inner(uf.eps(self.v_), sigma_tang(uf.eps(self.u_)))*self.dx
+        # res = -ufl.inner(uf.eps(self.u_), uf.as_3D_tensor(self.sig))*self.dx + self.F_ext(self.u_)
+
+
