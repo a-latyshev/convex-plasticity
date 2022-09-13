@@ -13,6 +13,10 @@ __pycache__/
 *.nav
 *.snm
 *.toc
+*.lot
+*.lof
+*.bbl
+*.blg
 **/_minted**
 *.so
 **/build
