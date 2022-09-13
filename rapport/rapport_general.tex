@@ -11,11 +11,16 @@
 \usepackage{titlesec}
 \usepackage{gensymb}
 \usepackage{hyperref}
-\usepackage{apacite}
+
+
+% \usepackage{apacite}
 % \usepackage{listings}  
 % \usepackage{color}
 % \usepackage{stmaryrd}
-\usepackage{eurosym}
+% \usepackage{eurosym}
+% \usepackage{natbib}
+\usepackage[style=apa]{biblatex}
+\addbibresource{src/bibs.bib}
 
 \usepackage{setspace} \onehalfspacing % interline interval
 
@@ -30,41 +35,6 @@
 % ]{biblatex}
 % \addbibresource{bibs.bib}
 
-% \DeclareMathOperator\dv{div} % divegence
-% \newcommand\ul[1]{\underline{#1}}
-
-% \newcommand\uF{\underline{\Phi}}
-% \newcommand\uX{\underline{X}}
-% \newcommand\ue{\underline{e}}
-% \newcommand\uuF{\ul{\ul{F}}}
-% \newcommand\uuP{\ul{\ul{P}}}
-% \newcommand\uuC{\ul{\ul{C}}}
-% \newcommand\uuE{\ul{\ul{E}}}
-% \newcommand\uuPsi{\ul{\ul{\Psi}}}
-% \newcommand\uuI{\ul{\ul{\mathrm{I}}}}
-% \newcommand\uus[1]{\ul{\ul{\sigma_{#1}}}}
-% \newcommand\uusigma{\ul{\ul{\sigma}}}
-% \newcommand\uueps{\ul{\ul{\varepsilon}}}
-% \newcommand\uuuuD{\ul{\ul{\ul{\ul{D}}}}}
-% \newcommand\uun{\ul{\ul{n}}}
-% \newcommand\uub{\ul{\ul{b}}}
-% \newcommand\uum{\ul{\ul{m}}}
-% \newcommand\uukappa{\ul{\ul{\kappa}}}
-% \newcommand\uuchi{\ul{\ul{\chi}}}
-% \newcommand\uu{\ul{u}}
-% \newcommand\uv{\ul{v}}
-% \newcommand\stt{\sigma_{\theta\theta}}
-% \newcommand\srr{\sigma_{rr}}
-% \newcommand\uuGradX{\ul{\ul{\nabla}}_{\ul{X}}}
-% \newcommand\mtr{\mathrm{tr}}
-% \newcommand\udiv[1]{\ul{\dv} \, #1}
-
-% \newcommand\difpar[2]{\frac{\partial#1}{\partial#2}}
-% \newcommand\dif[2]{\frac{\mathrm{d}#1}{\mathrm{d}#2}}
-
-% \newcommand{\pd}[2]{ % partial first derivative
-% 	\dfrac{\partial #1}{\partial #2}
-% }
 \setlength{\parindent}{1.25cm} 
 \setlength{\parskip}{1em}
 
@@ -77,6 +47,23 @@
 \fancyfoot[R]{\thepage}
 \fancyfoot[L]{Latyshev Andrey - Département Génie Mécanique et Matériaux}
 \renewcommand{\headrulewidth}{0.0pt}
+
+%Underlining ruler for subsections
+% \titleformat{\section}
+%   {\normalfont\Large\bfseries}
+%   {\thesection}
+%   {1em}
+%   {#1}
+% %   [{\titlerule[0.8pt]}]
+% \titleformat{\section}
+% {\normalfont\normalsize}
+% {\uline{\thesection} }
+% {1em}
+% {\uline}
+% \titlespacing{\section}
+% {0pt}
+% {\baselineskip}
+% {0.4\baselineskip}
 
 \usepackage{src/Latyshev_style}
 
@@ -117,10 +104,14 @@ Je suis reconnaissant à Patrick Dangla et Siavash Ghabezloo pour leur mentorat 
 Je remercie également Evgeny Andreev et Olivier Langeard pour leur aide et leur travail commun. Grâce à eux, j'ai appris plus rapidement un nouveau domaine de la simulation de navires.
 
 \newpage
+\section*{\centering Abstract}
+This internship aims at exploring a finite-element formulation of plasticity in the next generation FEniCS problem solving environment. The main goal is to propose an efficient and generic implementation which can tackle both classical and softening plasticity models. The intern will first familiarize himself with the DOLFINx computational environment and adapt existing implementations of legacy FEniCS code. The implementation will be then extended to the resolution of the local plasticity problem using convex optimization solvers and assess its efficiency compared to standard return mapping algorithms. Finally, softening plasticity will be considered and regularization strategies in order to prevent mesh dependency will be explored.
+
+\newpage
 \section*{\centering Résumé}
 
 \newpage
-\section*{\centering Abstract}
+\section*{\centering Synthèse du rapport en français}
 
 \renewcommand{\listtablename}{\centering Liste des tableaux}
 \renewcommand{\contentsname}{\centering Table des matières}
@@ -137,17 +128,45 @@ Je remercie également Evgeny Andreev et Olivier Langeard pour leur aide et leur
 \section*{Introduction}
 
 \newpage
-\section{Chapitre}
+% \addcontentsline{toc}{section}{Contexte et présentation de l’entreprise}
+\section{Contexte et présentation de l’entreprise}
 
-\cite{freefem}
+\newpage
+\section{Revue de littérature}
+
+\newpage
+\section{Méthodologie}
+
+\newpage
+\section{Résultats}
+
+\newpage
+\section{Discussion}
+
+sdf \parencite{Coussy} sdf \parencite{BRUNO2020724} sdf \parencite{Numba2015} sd \parencite{diamond2016cvxpy} s \parencite{bib:Domahidi2013ecos}
 
 \newpage 
 \addcontentsline{toc}{section}{Conclusion}
 \section*{Conclusion}
 
+\newpage
 \renewcommand\refname{\centering Bibliographie}
-
-\bibliographystyle{apalike}
-\bibliography{src/bibs}
+% \printbibheading
+\printbibliography
+% \bibliographystyle{src/apa.bst}
+% \bibliography{bibs}
 
 \end{document}
+
+
+% @article{BRUNO2020724,
+%   title = {Return-mapping algorithms for associative isotropic hardening plasticity using conic optimization},
+%   journal = {Applied Mathematical Modelling},
+%   volume = {78},
+%   pages = {724-748},
+%   year = {2020},
+%   issn = {0307-904X},
+%   doi = {https://doi.org/10.1016/j.apm.2019.10.006},
+%   url = {https://www.sciencedirect.com/science/article/pii/S0307904X19305943},
+%   author = {Hugo Bruno and Guilherme Barros and Ivan F.M. Menezes and Luiz Fernando Martha}
+% }
