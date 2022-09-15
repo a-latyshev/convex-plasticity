@@ -17,6 +17,8 @@ __pycache__/
 *.lof
 *.bbl
 *.blg
+*.bcf
+*.run.xml
 **/_minted**
 *.so
 **/build

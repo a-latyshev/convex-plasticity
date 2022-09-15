@@ -10,30 +10,14 @@
 \usepackage{float}
 \usepackage{titlesec}
 \usepackage{gensymb}
-\usepackage{hyperref}
+% \usepackage{hyperref}
+\usepackage[bookmarks,hypertexnames=false,debug]{hyperref}
+\usepackage{bookmark}
 
-
-% \usepackage{apacite}
-% \usepackage{listings}  
-% \usepackage{color}
-% \usepackage{stmaryrd}
-% \usepackage{eurosym}
-% \usepackage{natbib}
 \usepackage[style=apa]{biblatex}
 \addbibresource{src/bibs.bib}
 
 \usepackage{setspace} \onehalfspacing % interline interval
-
-% \renewcommand\refname{Bibliographie}
-% \addto\captionsngerman{\renewcommand*{\bibname}{Literaturliste}}
-% \addto\captionsrussian{\def\refname{Literaturliste}}
-% \documentclass[sigconf,natbib=false]{acmart}
-% \usepackage[
-% backend=biber,
-% style=apa,
-% sorting=ynt
-% ]{biblatex}
-% \addbibresource{bibs.bib}
 
 \setlength{\parindent}{1.25cm} 
 \setlength{\parskip}{1em}
@@ -43,27 +27,13 @@
 \pagestyle{fancy} 
 \fancyhead{}
 \fancyfoot{}
-\fancyhead[L]{Ecole Nationale des Ponts et Chaussées - Projet de fin d'Etudes}
 \fancyfoot[R]{\thepage}
-\fancyfoot[L]{Latyshev Andrey - Département Génie Mécanique et Matériaux}
-\renewcommand{\headrulewidth}{0.0pt}
+% \fancyhead[L]{École Nationale des Ponts et Chaussées - Projet de fin d'Etudes}
+% \fancyfoot[L]{Latyshev Andrey - Département Génie Mécanique et Matériaux}
+\fancyhead[L]{École Nationale des Ponts et Chaussées - End-of-studies project}
+\fancyfoot[L]{Latyshev Andrey - Department of Mechanical Engineering and Materials}
 
-%Underlining ruler for subsections
-% \titleformat{\section}
-%   {\normalfont\Large\bfseries}
-%   {\thesection}
-%   {1em}
-%   {#1}
-% %   [{\titlerule[0.8pt]}]
-% \titleformat{\section}
-% {\normalfont\normalsize}
-% {\uline{\thesection} }
-% {1em}
-% {\uline}
-% \titlespacing{\section}
-% {0pt}
-% {\baselineskip}
-% {0.4\baselineskip}
+\renewcommand{\headrulewidth}{0.0pt}
 
 \usepackage{src/Latyshev_style}
 
@@ -76,25 +46,51 @@
 	    {\large École des Ponts ParisTech}\\[0.2cm]
 	    {\normalsize 2021-2022}\\[.64cm]
 
-	    {\Large Projet de Fin d'Etudes}\\[.5cm]
-        {\large Département Génie Mécanique et Matériaux}\\[.85cm]
+	    {\Large End-of-studies project}\\[.5cm]
+        {\large Department of Mechanical Engineering and Materials}\\[.85cm]
         {\Large Andrey Latyshev}\\[1cm]    
-        {\large Élève ingénieur de double diplôme}\\[.85cm]
+        {\large Double degree engineering student}\\[.85cm]
 
         {\Large Finite-element implementation of standard and softening plasticity using a convex optimization approach}\\[1cm]
-        {\normalsize Projet réalisé au sein de Laboratoire Navier, ENPC}\\[0.2cm]
+        {\normalsize Project carried out within Laboratoire Navier, ENPC}\\[0.2cm]
 	    {\normalsize 6 et 8 avenue Blaise Pascal, Champs-sur-Marne, 77455}\\[0.2cm]
         {\normalsize 21/03/2022 - 09/09/2022}\\[1.1cm]
 
-        {\large Tuteur: Matthieu Vandamme}\\[1.1cm]
+        {\large Tutor: Jeremy Bleyer}\\[1.1cm]
     }
-    \noindent \textbf{\normalsize Composition du jury}\\
-    {\normalsize Président: Civilité Prénom Nom}\\
-    {\normalsize Directeur de projet: Civilité Prénom Nom}\\
-    {\normalsize Conseiller d'études: Civilité Prénom Nom}
+    \noindent \textbf{\normalsize Composition of jury}\\
+    {\normalsize President: Civilité Prénom Nom}\\
+    {\normalsize Project director: Civilité Prénom Nom}\\
+    {\normalsize Study advisor: Civilité Prénom Nom}
 \end{titlepage}
 
-\section*{\centering Remerciement}
+% \begin{titlepage}
+% 	{
+%         \center
+% 	    \includegraphics[width=40mm]{img/ENPC_logo.png}\\[.44cm]
+% 	    {\large École des Ponts ParisTech}\\[0.2cm]
+% 	    {\normalsize 2021-2022}\\[.64cm]
+
+% 	    {\Large Projet de Fin d'Etudes}\\[.5cm]
+%         {\large Département Génie Mécanique et Matériaux}\\[.85cm]
+%         {\Large Andrey Latyshev}\\[1cm]    
+%         {\large Élève ingénieur de double diplôme}\\[.85cm]
+
+%         {\Large Finite-element implementation of standard and softening plasticity using a convex optimization approach}\\[1cm]
+%         {\normalsize Projet réalisé au sein de Laboratoire Navier, ENPC}\\[0.2cm]
+% 	    {\normalsize 6 et 8 avenue Blaise Pascal, Champs-sur-Marne, 77455}\\[0.2cm]
+%         {\normalsize 21/03/2022 - 09/09/2022}\\[1.1cm]
+
+%         {\large Tuteur: Jeremy Bleyer}\\[1.1cm]
+%     }
+%     \noindent \textbf{\normalsize Composition du jury}\\
+%     {\normalsize Président: Civilité Prénom Nom}\\
+%     {\normalsize Directeur de projet: Civilité Prénom Nom}\\
+%     {\normalsize Conseiller d'études: Civilité Prénom Nom}
+% \end{titlepage}
+
+\section*{\centering Acknowledgements}
+% \section*{\centering Remerciement}
 \setcounter{page}{2}
 
 Je remercie Matthieu Vandamme pour son aide dans la recherche d'un stage, car en raison du début de la pandémie, la plupart des offres ont été fermées. Dans ces conditions, il était extrêmement difficile de trouver un premier stage. Sans son aide, il est peu probable que je commence l'expérience si tôt, ce qui était important pour mon cursus académique.
@@ -111,62 +107,59 @@ This internship aims at exploring a finite-element formulation of plasticity in 
 \section*{\centering Résumé}
 
 \newpage
-\section*{\centering Synthèse du rapport en français}
+\section*{\centering Synthèse du mémoire en français}
 
-\renewcommand{\listtablename}{\centering Liste des tableaux}
-\renewcommand{\contentsname}{\centering Table des matières}
-\renewcommand{\listfigurename}{\centering Liste des figures}
+\renewcommand{\contentsname}{\centering Table of contents}
+\renewcommand{\listtablename}{\centering List of tables}
+\renewcommand{\listfigurename}{\centering List of figures}
+
+% \renewcommand{\contentsname}{\centering Table des matières}
+% \renewcommand{\listtablename}{\centering Liste des tableaux}
+% \renewcommand{\listfigurename}{\centering Liste des figures}
 \newpage
 \tableofcontents
 \newpage
+\phantomsection
+\addcontentsline{toc}{section}{List of tables}
 \listoftables
 \newpage
+\phantomsection
+\addcontentsline{toc}{section}{List of figures}
 \listoffigures
-\newpage
 
+\newpage
+\phantomsection
 \addcontentsline{toc}{section}{Introduction}
 \section*{Introduction}
 
 \newpage
-% \addcontentsline{toc}{section}{Contexte et présentation de l’entreprise}
-\section{Contexte et présentation de l’entreprise}
+\section{Literature review}
+% \section{Revue de littérature}
 
 \newpage
-\section{Revue de littérature}
+\section{Methodology}
+% \section{Méthodologie}
 
 \newpage
-\section{Méthodologie}
-
-\newpage
-\section{Résultats}
+\section{Results}
+% \section{Résultats}
 
 \newpage
 \section{Discussion}
 
 sdf \parencite{Coussy} sdf \parencite{BRUNO2020724} sdf \parencite{Numba2015} sd \parencite{diamond2016cvxpy} s \parencite{bib:Domahidi2013ecos}
 
-\newpage 
+\newpage
+\phantomsection
 \addcontentsline{toc}{section}{Conclusion}
 \section*{Conclusion}
 
 \newpage
-\renewcommand\refname{\centering Bibliographie}
-% \printbibheading
+\phantomsection
+\addcontentsline{toc}{section}{Bibliography}
+\renewcommand\refname{\centering Bibliography}
+% \addcontentsline{toc}{section}{Bibliographie}
+% \renewcommand\refname{\centering Bibliographie}
 \printbibliography
-% \bibliographystyle{src/apa.bst}
-% \bibliography{bibs}
 
 \end{document}
-
-
-% @article{BRUNO2020724,
-%   title = {Return-mapping algorithms for associative isotropic hardening plasticity using conic optimization},
-%   journal = {Applied Mathematical Modelling},
-%   volume = {78},
-%   pages = {724-748},
-%   year = {2020},
-%   issn = {0307-904X},
-%   doi = {https://doi.org/10.1016/j.apm.2019.10.006},
-%   url = {https://www.sciencedirect.com/science/article/pii/S0307904X19305943},
-%   author = {Hugo Bruno and Guilherme Barros and Ivan F.M. Menezes and Luiz Fernando Martha}
-% }
