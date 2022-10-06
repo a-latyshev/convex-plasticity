@@ -24,3 +24,4 @@ __pycache__/
 **/build
 **/code_dir
 _*.*
+*.tdo
