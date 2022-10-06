@@ -30,7 +30,7 @@ Remark. We work here with the Voigt notation, which can be described as follows:
 import cvxpy as cp
 import numpy as np
 from abc import ABC, abstractmethod
-
+from scipy.sparse import block_diag
 from dolfinx import common
 
 class YieldCriterion(ABC):
@@ -188,18 +188,26 @@ class ReturnMapping:
         self.p = cp.Variable((N,),nonneg=True, name='p')
 
         self.sig_old.value = np.zeros((4, N))
-        # self.sig.value = np.zeros((4, N))
         self.deps.value = np.zeros((4, N))
         self.p_old.value = np.zeros((N,))
         self.C_tang = np.zeros((N, 4, 4))
 
         S = np.linalg.inv(material.C)
         delta_sig = self.sig - sig_elas
-        energy = []
-        for i in range(N):
-            energy.append(cp.quad_form(delta_sig[:, i], S))
+        # energy = []
+        # for i in range(N):
+        #     energy.append(cp.quad_form(delta_sig[:, i], S))
+        # target_expression = cp.sum(cp.hstack(energy)) + material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
+        
+        # energy = cp.sum(cp.diag(delta_sig.T @ S_sparsed @ delta_sig))
+        
+        S_sparsed = block_diag([S for _ in range(N)])
+        delta_sig_vector = cp.reshape(delta_sig, (N*4))
 
-        target_expression = cp.sum(cp.hstack(energy)) + material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
+        elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed)
+        # target_expression = 0.5*elastic_energy + 0.5*material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
+        D = material.yield_criterion.H * np.eye(N)
+        target_expression = 0.5*elastic_energy + 0.5*cp.quad_form(self.p - self.p_old, D)
 
         constrains = material.yield_criterion.criterion(self.sig, self.p) 
 
@@ -208,8 +216,16 @@ class ReturnMapping:
 
         self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
         self.solver = solver
+    
+    def solve(self, **kwargs):
+        """Solves a minimization problem and calculates the derivative of `sig` variable.
         
-    def solve(self, derivation=True, **kwargs):
+        Args:
+            **kwargs: additional solver attributes, such as tolerance, etc.
+        """
+        self.opt_problem.solve(solver=self.solver, requires_grad=False, **kwargs)
+        
+    def solve_and_derivate(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
         
         Args:
@@ -217,20 +233,19 @@ class ReturnMapping:
         """
 
         with common.Timer() as t: 
-            self.opt_problem.solve(solver=self.solver, requires_grad=True*derivation, **kwargs)
+            self.opt_problem.solve(solver=self.solver, requires_grad=True, **kwargs)
             self.convex_solving_time = t.elapsed()[0] 
         
-        if derivation:
-            with common.Timer() as t: 
-                for i in range(4):
-                    for j in range(self.N):
-                        e = np.zeros((4, self.N))
-                        e[i, j] = 1
-                        self.deps.delta = e
-                        self.opt_problem.derivative()
-                        self.C_tang[j, :, i] = self.sig.delta[:, j] 
-                
-                self.differentiation_time = t.elapsed()[0] # time.time() - start
+        with common.Timer() as t: 
+            for i in range(4):
+                for j in range(self.N):
+                    e = np.zeros((4, self.N))
+                    e[i, j] = 1
+                    self.deps.delta = e
+                    self.opt_problem.derivative()
+                    self.C_tang[j, :, i] = self.sig.delta[:, j] 
+            
+            self.differentiation_time = t.elapsed()[0] # time.time() - start
     
 # from petsc4py import PETSc
 

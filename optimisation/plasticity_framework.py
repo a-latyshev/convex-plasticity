@@ -119,7 +119,7 @@ class NonlinearProblem(LinearProblem):
         nRes = nRes0
         niter = 0
 
-        start = time.time()
+        # start = time.time()
 
         while nRes/nRes0 > self.tol and niter < self.Nitermax:
             
@@ -262,7 +262,7 @@ class SNESProblem(LinearProblem):
 class AbstractPlasticity():
     def __init__(
         self, 
-        material: crm.Material, 
+        sig0: np.float64, 
         mesh_name: str = "thick_cylinder.msh", 
         logger: Optional[logging.Logger] = None,
     ):
@@ -285,7 +285,7 @@ class AbstractPlasticity():
 
         with io.XDMFFile(MPI.COMM_WORLD, "mt.xdmf", "r") as xdmf:
             ft = xdmf.read_meshtags(self.mesh, name="Grid")
-
+        
         deg_u = 2
         self.deg_stress = 2
 
@@ -316,7 +316,7 @@ class AbstractPlasticity():
 
         Re, Ri = 1.3, 1.   # external/internal radius
         n = ufl.FacetNormal(self.mesh)
-        self.q_lim = float(2/np.sqrt(3)*np.log(Re/Ri)*material.yield_criterion.sig0)
+        self.q_lim = float(2/np.sqrt(3)*np.log(Re/Ri)*sig0)
         self.loading = fem.Constant(self.mesh, PETSc.ScalarType(0.0 * self.q_lim))
 
         self.ds = ufl.Measure("ds", domain=self.mesh, subdomain_data=ft)
@@ -342,6 +342,19 @@ class AbstractPlasticity():
         else:
             self.logger = logging.getLogger('abstract_plasticity')
 
+        num_nodes_global = self.mesh.topology.index_map(self.mesh.topology.dim - 2).size_global
+        num_cells_global = self.mesh.topology.index_map(self.mesh.topology.dim).size_global
+        num_quadrature_points_global = self.W0.dofmap.index_map.size_global
+        num_nodes_local = self.mesh.topology.index_map(self.mesh.topology.dim - 2).size_local
+        num_cells_local = self.mesh.topology.index_map(self.mesh.topology.dim).size_local
+        num_quadrature_points_local = self.W0.dofmap.index_map.size_local
+
+        if MPI.COMM_WORLD.rank == 0:
+            self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: mesh = {mesh_name}')
+            self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: mesh info: {num_nodes_global} nodes (global), {num_cells_global} cells (global), {num_quadrature_points_global} quadrature_points (Q2 space) (global)')
+        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: mesh info: {num_nodes_local} nodes (local), {num_cells_local} cells (local), {num_quadrature_points_local} quadrature_points (Q2 space) (local)')
+        
+
     def inside_Newton(self) -> None:
         pass
 
@@ -354,7 +367,6 @@ class AbstractPlasticity():
     def solve(self, Nincr: int = 20) -> tuple[List, np.ndarray, float, fem.function.Function, fem.function.Function, fem.function.Function]:
         load_steps = np.linspace(0, 1.1, Nincr+1)[1:]**0.5
         results = np.zeros((Nincr+1, 2))
-        load_steps = load_steps
         # xdmf = io.XDMFFile(MPI.COMM_WORLD, "plasticity.xdmf", "w", encoding=io.XDMFFile.Encoding.HDF5)
         # xdmf.write_mesh(mesh)
 
@@ -367,14 +379,14 @@ class AbstractPlasticity():
 
             self.Du.x.array[:] = 0
 
-            # if MPI.COMM_WORLD.rank == 0:
-            #     print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {t * self.q_lim}")
             nRes0 = self.problem.b.norm()
             self.logger.info(f'rank#{MPI.COMM_WORLD.rank}: Step: {str(i+1)}, norm(nRes0) = {nRes0:.1e}, load = {t * self.q_lim}')
 
             start_step = time.time()
             niters = self.problem.solve()
-            self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Step: {str(i+1)}, Iterations = {niters}, Time = {time.time() - start_step:.2f} (s) \n')
+            end_step = time.time()
+
+            self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Step: {str(i+1)}, Iterations = {niters}, Time = {end_step - start_step:.2f} (s)')
 
             self.u.vector.axpy(1, self.Du.vector) # u = u + 1*Du
             self.u.x.scatter_forward()
@@ -391,7 +403,7 @@ class AbstractPlasticity():
         # xdmf.close()
         # end = time.time()
         total_time = time.time() - start
-        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {total_time:.2f} (s)')
+        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {total_time:.2f} (s)\n')
 
         return self.points_on_proc, results, total_time, self.sig, self.p, self.u
 
@@ -403,14 +415,15 @@ class vonMisesPlasticity(AbstractPlasticity):
         logger: Optional[logging.Logger] = None,
         solver: str = "nonlinear",
     ):
-        super().__init__(material, mesh_name, logger)
+        sig0 = material.yield_criterion.sig0
+        mu_ = material.constitutive_law.mu_
+        lambda_ = material.constitutive_law.lambda_
+        H = material.yield_criterion.H
+
+        super().__init__(sig0, mesh_name, logger)
 
         self.dp = fem.Function(self.W0) 
 
-        mu_ = material.constitutive_law.mu_
-        lambda_ = material.constitutive_law.lambda_
-        sig0 = material.yield_criterion.sig0
-        H = material.yield_criterion.H
         
         self.proj_sig = lambda deps, old_sig, old_p: uf.proj_sig_vonMises(deps, old_sig, old_p, lambda_, mu_, sig0, H)
         
@@ -517,10 +530,7 @@ class DruckerPragerPlasticity(AbstractPlasticity):
         logger: Optional[logging.Logger] = None,
         solver: str = "nonlinear",
     ):
-        super().__init__(material, mesh_name, logger)
-
-        self.dp = fem.Function(self.W0) 
-
+        sig0 = material.yield_criterion.sig0
         mu_ = material.constitutive_law.mu_
         lambda_ = material.constitutive_law.lambda_
         k = lambda_ + 2*mu_/3 # Bulk modulus 
@@ -529,12 +539,16 @@ class DruckerPragerPlasticity(AbstractPlasticity):
         alpha = material.yield_criterion.alpha
         M = (3*mu_ + 9*alpha*alpha*k) + H
 
+        super().__init__(sig0, mesh_name, logger)
+
+        self.dp = fem.Function(self.W0) 
+
         self.proj_sig = lambda deps, old_sig, old_p: uf.proj_sig(deps, old_sig, old_p, lambda_, mu_, sig0, H, alpha, M, k)
         
         if solver == 'nonlinear':
-            self.sig_old = fem.Function(W)
-            self.n_elas = fem.Function(W)
-            self.beta = fem.Function(W0)
+            self.sig_old = fem.Function(self.W)
+            self.n_elas = fem.Function(self.W)
+            self.beta = fem.Function(self.W0)
      
             sigma_tang = lambda e: uf.sigma_tang(e, self.n_elas, self.beta, lambda_, mu_, H, alpha, M, k)
 
@@ -634,35 +648,60 @@ class ConvexPlasticity(AbstractPlasticity):
         mesh_name: str = "thick_cylinder.msh", 
         logger: Optional[logging.Logger] = None,
         solver: str = "nonlinear",
+        conic_solver: str = 'SCS',
+        tol_Newton: float = 1e-8,
+        tol_conic_solver: float = 1e-13
     ):
-        super().__init__(material, mesh_name, logger)
+        if isinstance(material.yield_criterion, crm.DruckerPrager) or isinstance(material.yield_criterion, crm.vonMises):
+            sig0 = material.yield_criterion.sig0
+        elif isinstance(material.yield_criterion, crm.Rankine):
+            sig0 = material.yield_criterion.ft
+        else:
+            raise RuntimeError(f"Convex plasticity doesn't support this material, chose another one.")
+
+        mu_ = material.constitutive_law.mu_
+        lambda_ = material.constitutive_law.lambda_
+        
+        super().__init__(sig0, mesh_name, logger)
+
+        if MPI.COMM_WORLD.rank == 0:
+            self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Newton solver = {solver}, conic solver = {conic_solver}, patch size = {patch_size}')
 
         self.sig_old = fem.Function(self.W)
         self.p_old = fem.Function(self.W0) 
         self.deps = fem.Function(self.W, name="deps")
-        tol_convex = 1e-13
+
+        # tol_convex = 1e-13
+        conic_solver_params = {}
+        if conic_solver == 'SCS':
+            conic_solver_params = {
+                'eps': tol_conic_solver, 
+                'eps_abs': tol_conic_solver, 
+                'eps_rel': tol_conic_solver,
+                'eps_infeas': 1e-12,
+            }
+        elif conic_solver == 'MOSEK':
+            conic_solver_params = {'mosek_params': {
+                'MSK_DPAR_BASIS_TOL_X': 1.0e-9, 
+                'MSK_DPAR_BASIS_TOL_S': 1.0e-9, 
+                'MSK_DPAR_INTPNT_TOL_DFEAS': 1.0e-9, 
+                'MSK_DPAR_INTPNT_TOL_PFEAS': 1.0e-9,
+                'MSK_DPAR_INTPNT_TOL_REL_GAP': 1.0e-9,
+                'MSK_DPAR_BASIS_REL_TOL_S': 1.0e-10
+            }}
+        elif conic_solver == 'ECOS':
+            conic_solver_params = {'abstol': tol_conic_solver, 'reltol': tol_conic_solver}
+        else:
+            raise RuntimeError(f"Convex plasticity supports SCS, MOSEK and ECOS conic solvers.")
         
         deps_Voigt = uf.eps_Voigt(self.Du)
-        mu_ = material.constitutive_law.mu_
-        lambda_ = material.constitutive_law.lambda_
         sigma = lambda eps: uf.sigma(eps, lambda_, mu_)
         
-        # deps_p = None
-        
-        # if isinstance(material.yield_criterion, crm.DruckerPrager):
-        #     sig0 = material.yield_criterion.sig0
-        #     H = material.yield_criterion.H
-        #     alpha = material.yield_criterion.alpha
-
-        #     deps_p = lambda deps, old_sig, p, old_p: uf.deps_p_convex(deps, old_sig, p, old_p, lambda_, mu_, sig0, H, alpha)
-        # else:
-        #     raise RuntimeError(f"Convex plasticity supports Drucker-Prager materials, chose another one.")
-
         self.n_quadrature_points = len(self.p.x.array)
         self.N_patches = int(self.n_quadrature_points / patch_size)
         self.residue_size = self.n_quadrature_points % patch_size
 
-        self.return_mapping = crm.ReturnMapping(material, patch_size)
+        self.return_mapping = crm.ReturnMapping(material, patch_size, conic_solver)
         self.material = material
 
         self.p_values = self.p.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
@@ -672,7 +711,7 @@ class ConvexPlasticity(AbstractPlasticity):
         self.sig_old_values = self.sig_old.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
 
         if self.residue_size != 0:
-            self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size)
+            self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size, conic_solver)
             
             self.p_values_residue = self.p.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
             self.p_old_values_residue = self.p_old.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
@@ -690,7 +729,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
                     self.return_mapping.p_old.value = self.p_old_values[q,:]
                     
-                    self.return_mapping.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping.solve_and_derivate(verbose=False, **conic_solver_params)
 
                     self.sig_values[q,:] = self.return_mapping.sig.value[:].T
                     self.p_values[q,:] = self.return_mapping.p.value
@@ -701,7 +740,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
                     self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
                     
-                    self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping_residue.solve_and_derivate(verbose=False, **conic_solver_params)
                     
                     self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
                     self.p_values_residue[0,:] = self.return_mapping_residue.p.value
@@ -730,7 +769,7 @@ class ConvexPlasticity(AbstractPlasticity):
 
             a_Newton = ufl.inner(uf.eps_Voigt(self.v_), ufl.dot(self.C_tang, uf.eps_Voigt(self.u_)))*self.dx 
             res = -ufl.inner(uf.eps(self.u_), uf.as_3D_tensor_Voigt(self.sig))*self.dx + self.F_ext(self.u_)
-            self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs, Nitermax=200, tol=1e-8, inside_Newton=self.inside_Newton, logger=self.logger)
+            self.problem = NonlinearProblem(a_Newton, res, self.Du, self.bcs, Nitermax=200, tol=tol_Newton, inside_Newton=self.inside_Newton, logger=self.logger)
 
         elif solver == 'SNESQN':
             def inside_Newton():
@@ -742,7 +781,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
                     self.return_mapping.p_old.value = self.p_old_values[q,:]
                     
-                    self.return_mapping.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping.solve(verbose=False, **conic_solver_params)
                     self.sig_values[q,:] = self.return_mapping.sig.value[:].T
                     self.p_values[q,:] = self.return_mapping.p.value
 
@@ -751,7 +790,7 @@ class ConvexPlasticity(AbstractPlasticity):
                     self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
                     self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
                     
-                    self.return_mapping_residue.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping_residue.solve(verbose=False, **conic_solver_params)
                     self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
                     self.p_values_residue[0,:] = self.return_mapping_residue.p.value
 
@@ -770,39 +809,23 @@ class ConvexPlasticity(AbstractPlasticity):
             residual = ufl.inner(uf.as_3D_tensor_Voigt(self.sig), uf.eps(self.u_))*self.dx - self.F_ext(self.u_)
             J = ufl.derivative(ufl.inner(sigma(uf.eps(self.Du)), uf.eps(self.u_))*self.dx, self.Du, self.v_)
 
-            petsc_options = {}
-            if solver == 'SNES':
-                petsc_options = {
-                    "snes_type": "vinewtonrsls",
-                    "snes_linesearch_type": "basic",
-                    "ksp_type": "preonly",
-                    "pc_type": "lu",
-                    "pc_factor_mat_solver_type": "mumps",
-                    "snes_atol": 1.0e-08,
-                    "snes_rtol": 1.0e-08,
-                    "snes_stol": 0.0,
-                    "snes_max_it": 500,
-                    # "snes_monitor": "",
-                    "snes_monitor_cancel": "",
-                }
-            else:
-                petsc_options = {
-                    "snes_type": "qn",
-                    "snes_qn_type": "lbfgs", #lbfgs broyden, badbroyden
-                    "snes_qn_m": 100,
-                    "snes_qn_scale_type": "jacobian", #<diagonal,none,scalar,jacobian> 	
-                    "snes_qn_restart_type": "none", #<powell,periodic,none> 
-                    "pc_type": "cholesky", # cholesky >> hypre > gamg, sor ; asm, lu, gas - don't work
-                    "snes_linesearch_type": "basic",
-                    "ksp_type": "preonly",
-                    "pc_factor_mat_solver_type": "mumps",
-                    "snes_atol": 1.0e-08,
-                    "snes_rtol": 1.0e-08,
-                    "snes_stol": 0.0,
-                    "snes_max_it": 500,
-                    # "snes_monitor": "",
-                    "snes_monitor_cancel": "",
-                }
+            petsc_options = {
+                "snes_type": "qn",
+                "snes_qn_type": "lbfgs", #lbfgs broyden, badbroyden
+                "snes_qn_m": 100,
+                "snes_qn_scale_type": "jacobian", #<diagonal,none,scalar,jacobian> 	
+                "snes_qn_restart_type": "none", #<powell,periodic,none> 
+                "pc_type": "cholesky", # cholesky >> hypre > gamg, sor ; asm, lu, gas - don't work
+                "snes_linesearch_type": "basic",
+                "ksp_type": "preonly",
+                "pc_factor_mat_solver_type": "mumps",
+                "snes_atol": tol_Newton,
+                "snes_rtol": tol_Newton,
+                "snes_stol": 0.0,
+                "snes_max_it": 500,
+                # "snes_monitor": "",
+                "snes_monitor_cancel": "",
+            }
             self.problem = SNESProblem(residual, self.Du, J, self.bcs, petsc_options=petsc_options, inside_Newton=self.inside_Newton, logger=self.logger)
         else:
             raise RuntimeError(f"Solver {solver} doesn't support!")
@@ -819,34 +842,75 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
         mesh_name: str = "thick_cylinder.msh", 
         logger: Optional[logging.Logger] = None,
         solver: str = "nonlinear",
+        conic_solver: str = "SCS",
+        tol_Newton: float = 1e-8,
+        tol_conic_solver: float = 1e-13
     ):
-        super().__init__(material, mesh_name, logger)
+        mu_ = material.constitutive_law.mu_
+        lambda_ = material.constitutive_law.lambda_
+        H = material.yield_criterion.H
 
+        deps_p = None
+        if isinstance(material.yield_criterion, crm.DruckerPrager):
+            alpha = material.yield_criterion.alpha
+            k = lambda_ + 2*mu_/3 # Bulk modulus 
+            sig0 = material.yield_criterion.sig0
+            M = (3*mu_ + 9*alpha*alpha*k) + H
+            
+            deps_p = lambda deps, old_sig, old_p: uf.deps_p_convex(deps, old_sig, old_p, lambda_, mu_, sig0, H, alpha, M)
+            # deps_p = lambda deps, old_sig, old_p: uf.deps_p_vonMises(deps, old_sig, old_p, lambda_, mu_, sig0, H)
+
+        # elif isinstance(material.yield_criterion, crm.vonMises):
+        #     print('vonMises')
+        #     sig0 = material.yield_criterion.sig0
+        #     def deps_p_vonMises(deps, old_sig, old_p):
+        #         sig_n = uf.as_3D_tensor_Voigt(old_sig)
+        #         sig_elas = sig_n + sigma(deps)
+        #         s = ufl.dev(sig_elas)
+        #         sig_eq = ufl.sqrt(3/2.*ufl.inner(s, s))
+        #         f_elas = sig_eq - sig0 - H*old_p
+        #         deps_p = ufl.conditional(f_elas > 0, 3./2. * f_elas/(3*mu_+H) * s/sig_eq , 0*ufl.Identity(3))  # sig_eq is equal to 0 on the first iteration
+        #         # dp = ppos(f_elas)/(3*mu+H) # this approach doesn't work with ufl.derivate
+        #         return deps_p
+        #     deps_p = deps_p_vonMises
+
+        else:
+            raise RuntimeError(f"Convex plasticity supports Drucker-Prager materials, chose another one.")
+
+        super().__init__(sig0, mesh_name, logger)
+    
+        if MPI.COMM_WORLD.rank == 0:
+            self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Newton solver = {solver}, conic solver = {conic_solver}, patch size = {patch_size}')
+        
         self.sig_old = fem.Function(self.W)
         self.p_old = fem.Function(self.W0) 
         self.deps = fem.Function(self.W, name="deps")
-        tol_convex = 1e-13
-        
+
+        conic_solver_params = {}
+        if conic_solver == 'SCS':
+            conic_solver_params = {'eps': tol_conic_solver, 'eps_abs': tol_conic_solver, 'eps_rel': tol_conic_solver}
+        elif conic_solver == 'MOSEK':
+            conic_solver_params = {'mosek_params': {
+                'MSK_DPAR_BASIS_TOL_X': 1.0e-9, 
+                'MSK_DPAR_BASIS_TOL_S': 1.0e-9, 
+                'MSK_DPAR_INTPNT_TOL_DFEAS': 1.0e-9, 
+                'MSK_DPAR_INTPNT_TOL_PFEAS': 1.0e-9,
+                'MSK_DPAR_INTPNT_TOL_REL_GAP': 1.0e-9,
+                'MSK_DPAR_BASIS_REL_TOL_S': 1.0e-10
+            }}
+        elif conic_solver == 'ECOS':
+            conic_solver_params = {'abstol': tol_conic_solver, 'reltol': tol_conic_solver}
+        else:
+            raise RuntimeError(f"Convex plasticity supports SCS, MOSEK and ECOS conic solvers.")
+
         deps_Voigt = uf.eps_Voigt(self.Du)
         sigma = lambda eps: uf.sigma(eps, lambda_, mu_)
-        deps_p = None
-        
-        if isinstance(material.yield_criterion, crm.DruckerPrager):
-            mu_ = material.constitutive_law.mu_
-            lambda_ = material.constitutive_law.lambda_
-            sig0 = material.yield_criterion.sig0
-            H = material.yield_criterion.H
-            alpha = material.yield_criterion.alpha
-
-            deps_p = lambda deps, old_sig, p, old_p: uf.deps_p_convex(deps, old_sig, p, old_p, lambda_, mu_, sig0, H, alpha)
-        else:
-            raise RuntimeError(f"Convex plasticity supports Drucker-Prager materials, chose another one.")
 
         self.n_quadrature_points = len(self.p.x.array)
         self.N_patches = int(self.n_quadrature_points / patch_size)
         self.residue_size = self.n_quadrature_points % patch_size
 
-        self.return_mapping = crm.ReturnMapping(material, patch_size)
+        self.return_mapping = crm.ReturnMapping(material, patch_size, conic_solver)
         self.material = material
 
         self.p_values = self.p.x.array[:self.n_quadrature_points - self.residue_size].reshape((-1, patch_size))
@@ -856,7 +920,7 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
         self.sig_old_values = self.sig_old.x.array[:4*(self.n_quadrature_points - self.residue_size)].reshape((-1, patch_size, 4))
 
         if self.residue_size != 0:
-            self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size)
+            self.return_mapping_residue = crm.ReturnMapping(material, self.residue_size, conic_solver)
             
             self.p_values_residue = self.p.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
             self.p_old_values_residue = self.p_old.x.array[self.n_quadrature_points - self.residue_size:].reshape((1, self.residue_size))
@@ -874,7 +938,7 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
                     self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
                     self.return_mapping.p_old.value = self.p_old_values[q,:]
                     
-                    self.return_mapping.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping.solve_and_derivate(verbose=False, **conic_solver_params)
 
                     self.sig_values[q,:] = self.return_mapping.sig.value[:].T
                     self.p_values[q,:] = self.return_mapping.p.value
@@ -885,7 +949,7 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
                     self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
                     self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
                     
-                    self.return_mapping_residue.solve(derivation=True, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping_residue.solve_and_derivate(verbose=False, **conic_solver_params)
                     
                     self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
                     self.p_values_residue[0,:] = self.return_mapping_residue.p.value
@@ -919,14 +983,15 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
         elif solver == 'SNES' or solver == 'SNESQN':
             def inside_Newton():
                 start_return_mapping = time.time()
-                
+
                 fs.interpolate_quadrature(deps_Voigt, self.deps) # eps_xy * sqrt(2.)!
+
                 for q in range(self.N_patches):
                     self.return_mapping.deps.value[:] = self.deps_values[q,:].T
                     self.return_mapping.sig_old.value[:] = self.sig_old_values[q,:].T
                     self.return_mapping.p_old.value = self.p_old_values[q,:]
                     
-                    self.return_mapping.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping.solve(verbose=False, **conic_solver_params)
                     self.sig_values[q,:] = self.return_mapping.sig.value[:].T
                     self.p_values[q,:] = self.return_mapping.p.value
 
@@ -935,7 +1000,7 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
                     self.return_mapping_residue.sig_old.value[:] = self.sig_old_values_residue[0,:].T
                     self.return_mapping_residue.p_old.value = self.p_old_values_residue[0,:]
                     
-                    self.return_mapping_residue.solve(derivation=False, verbose=False, eps=tol_convex, eps_abs=tol_convex, eps_rel=tol_convex)
+                    self.return_mapping_residue.solve(verbose=False, **conic_solver_params)
                     self.sig_values_residue[0,:] = self.return_mapping_residue.sig.value[:].T
                     self.p_values_residue[0,:] = self.return_mapping_residue.p.value
 
@@ -951,8 +1016,11 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
                 self.u.vector.set(0.0)
             self.initialize_variables = initialize_variables
 
-            residual = ufl.inner(uf.as_3D_tensor_Voigt(self.sig_old) + sigma(uf.eps(self.Du) - deps_p(uf.eps(self.Du), self.sig_old, self.p, self.p_old)), uf.eps(self.u_))*self.dx - self.F_ext(self.u_)
-            J = ufl.derivative(ufl.inner(sigma(uf.eps(self.Du) - deps_p(uf.eps(self.Du), self.sig, self.p, self.p_old)), uf.eps(self.u_))*self.dx, self.Du, self.v_)
+            residual = ufl.inner(uf.as_3D_tensor_Voigt(self.sig_old) + sigma(uf.eps(self.Du) - deps_p(uf.eps(self.Du), self.sig_old, self.p_old)), uf.eps(self.u_))*self.dx - self.F_ext(self.u_)
+            J = ufl.derivative(ufl.inner(sigma(uf.eps(self.Du)), uf.eps(self.u_))*self.dx, self.Du, self.v_)
+
+            J = ufl.derivative(ufl.inner(sigma(uf.eps(self.Du) - deps_p(uf.eps(self.Du), self.sig_old, self.p_old)), uf.eps(self.u_))*self.dx, self.Du, self.v_)
+            # J = ufl.derivative(ufl.inner(sigma(uf.eps(self.Du) - deps_p(uf.eps(self.Du), self.sig_old, self.p_old)), uf.eps(self.u_))*self.dx, self.Du, self.v_)
 
             petsc_options = {}
             if solver == 'SNES':
@@ -962,8 +1030,8 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
                     "ksp_type": "preonly",
                     "pc_type": "lu",
                     "pc_factor_mat_solver_type": "mumps",
-                    "snes_atol": 1.0e-08,
-                    "snes_rtol": 1.0e-08,
+                    "snes_atol": tol_Newton,
+                    "snes_rtol": tol_Newton,
                     "snes_stol": 0.0,
                     "snes_max_it": 500,
                     # "snes_monitor": "",
@@ -980,8 +1048,8 @@ class ConvexAnalyticalPlasticity(AbstractPlasticity):
                     "snes_linesearch_type": "basic",
                     "ksp_type": "preonly",
                     "pc_factor_mat_solver_type": "mumps",
-                    "snes_atol": 1.0e-08,
-                    "snes_rtol": 1.0e-08,
+                    "snes_atol": tol_Newton,
+                    "snes_rtol": tol_Newton,
                     "snes_stol": 0.0,
                     "snes_max_it": 500,
                     # "snes_monitor": "",

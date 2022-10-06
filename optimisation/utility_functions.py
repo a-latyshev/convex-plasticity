@@ -44,7 +44,7 @@ def deps_p_vonMises(deps, old_sig, old_p, lambda_: float, mu_: float, sig0: floa
     s = ufl.dev(sig_elas)
     sig_eq = ufl.sqrt(3/2.*ufl.inner(s, s))
     f_elas = sig_eq - sig0 - H*old_p
-    deps_p = ufl.conditional(f_elas > 0, 3./2. * f_elas/(3*mu_+H) * s/sig_eq, 0) # sig_eq is equal to 0 on the first iteration
+    deps_p = ufl.conditional(f_elas > 0, 3./2. * f_elas/(3*mu_+H) * s/sig_eq, 0 * ufl.Identity(3)) # sig_eq is equal to 0 on the first iteration
     # dp = ppos(f_elas)/(3*mu+H) # this approach doesn't work with ufl.derivate
     return deps_p
 
@@ -86,12 +86,14 @@ def as_3D_tensor_Voigt(X):
                           [X[3] / SQRT2, X[1], 0],
                           [0, 0, X[2]]])
 
-def deps_p_convex(deps, old_sig, p, old_p, lambda_: float, mu_: float, sig0: float, H: float, alpha: float):
+def deps_p_convex(deps, old_sig, old_p, lambda_: float, mu_: float, sig0: float, H: float, alpha: float, M: float):
     sig_n = as_3D_tensor_Voigt(old_sig)
     sig_elas = sig_n + sigma(deps, lambda_, mu_)
     s = ufl.dev(sig_elas)
     sig_eq = ufl.sqrt(3/2.*ufl.inner(s, s))
     tr_sig = ufl.tr(sig_elas)
     f_elas = sig_eq + alpha*tr_sig - sig0 - H*old_p
-    deps_p = ufl.conditional(f_elas > 0, (p - old_p) * (3./2. * s / sig_eq + alpha * ufl.Identity(3)), 0*ufl.Identity(3)) 
+    # deps_p = ufl.conditional(f_elas > 0, (p - old_p) * (3./2. * s / sig_eq + alpha * ufl.Identity(3)), 0*ufl.Identity(3)) 
+    deps_p = ufl.conditional(f_elas > 0, f_elas/M  * (3./2. * s/sig_eq + alpha * ufl.Identity(3)), 0 * ufl.Identity(3))
+
     return deps_p
