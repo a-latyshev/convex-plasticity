@@ -857,6 +857,11 @@ class CustomProblem(pf.LinearProblem):
         Args:
             du: A global vector to be used as a container for the solution of the linear system
         """
+        with self.g.localForm() as g_local:
+            g_local.set(0.0)
+        with self.x0.localForm() as x0_local:
+            x0_local.set(0.0)
+
         self.assemble_Neumann()
         self.assemble_vector()
     
@@ -864,9 +869,6 @@ class CustomProblem(pf.LinearProblem):
         nRes = nRes0
         niter = 0
 
-        # if MPI.COMM_WORLD.rank == 0:
-        #     print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {loading.value}")
-     
         while nRes/nRes0 > self.tol and niter < self.Nitermax:
             self.solver.solve(self.b, self.du.vector)
 
@@ -876,9 +878,9 @@ class CustomProblem(pf.LinearProblem):
             self.assemble()
             
             nRes = self.b.norm() 
-            if MPI.COMM_WORLD.rank == 0:
-                print(f"    Residual: {nRes}")
             niter += 1
+            self.logger.debug(f'rank#{MPI.COMM_WORLD.rank}  Increment: {niter}, norm(Res/Res0) = {nRes/nRes0:.1e}.')
+
         
         return niter
 
@@ -1161,14 +1163,6 @@ class CustomPlasticity(pf.AbstractPlasticity):
 
         self.problem = CustomProblem(a_Newton, res, self.Du, local_assembling_A, local_assembling_b, self.bcs, res_Neumann=res_Neumann, Nitermax=200, tol=1e-8, logger=self.logger)
 
-        # def inside_Newton():
-        #     deps = uf.eps(self.Du)
-        #     sig_, n_elas_, beta_, self.dp_ = self.proj_sig(deps, self.sig_old, self.p)
-        #     fs.interpolate_quadrature(sig_, self.sig)
-        #     fs.interpolate_quadrature(n_elas_, self.n_elas)
-        #     fs.interpolate_quadrature(beta_, self.beta)
-        # self.inside_Newton = inside_Newton
-
         def after_Newton():
             self.sig_old.x.array[:] = self.sig.x.array[:]
             self.p.vector.axpy(1, self.dp.vector)
@@ -1176,14 +1170,17 @@ class CustomPlasticity(pf.AbstractPlasticity):
         self.after_Newton = after_Newton
 
         def initialize_variables():
+            print('Hello')
             self.sig.vector.set(0.0)
             self.sig_old.vector.set(0.0)
             self.p.vector.set(0.0)
             self.dp.vector.set(0.0)
             self.u.vector.set(0.0)
+            self.C_tang.vector.set(0.0)
+        
+            # with self.g.localForm() as g_local:
+            #     g_local.set(0.0)
+            # with self.x0.localForm() as x0_local:
+            #     x0_local.set(0.0)
+
         self.initialize_variables = initialize_variables 
-
-        # a_Newton = ufl.inner(uf.eps(self.v_), sigma_tang(uf.eps(self.u_)))*self.dx
-        # res = -ufl.inner(uf.eps(self.u_), uf.as_3D_tensor(self.sig))*self.dx + self.F_ext(self.u_)
-
-
