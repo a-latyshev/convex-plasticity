@@ -31,7 +31,7 @@ def project(original_field, target_field:fem.Function, dx:ufl.Measure=ufl.dx, bc
     solver.solve(b, target_field.vector)  
     target_field.x.scatter_forward()
 
-# Defining the function to interpolate a function defined over quadrature elements
+# Interpolation of a function defined over quadrature elements
 def interpolate_quadrature(ufl_expr, fem_func:fem.Function):
     q_dim = fem_func.function_space._ufl_element.degree()
     mesh = fem_func.ufl_function_space().mesh

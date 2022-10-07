@@ -25,3 +25,4 @@ __pycache__/
 **/code_dir
 _*.*
 *.tdo
+assembling_strategies/mesh
