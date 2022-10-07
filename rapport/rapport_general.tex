@@ -612,7 +612,7 @@ Note that the optimization problem is solved $\left\lfloor N_q / N_\text{patch}\
 
 \subsection{Performance}
 
-\todounderline{Copy from readme}
+\todounderline{Copy from readme about custom assembling, numba, etc}
 
 \newpage
 \section{Results}
@@ -645,10 +645,10 @@ For numerical tests, the initial problem with the von Mises criterion was chosen
 		Dense & 811	& 1478 & 4434 \\
 		\hline
 	\end{tabular}
-	\caption{Mesh data for numerical tests}
+	\caption{Mesh data of time performance numerical tests for patch size effect}
     \label{tab:cvxpy_tests}
 \end{table}
-where Q2 space means the size of the finite element functional space of the second degree based on quadrature elements.s
+where Q2 space means the size of the finite element functional space of the second degree based on quadrature elements.
 
 The images~\ref{fig:conic_solvers_coarse}--\ref{fig:conic_solvers_dense} demonstrate a comparison of the total program time for three meshes of different densities, using three different conic solvers depending on the patch size $N_\text{patch}$. The compilation time of the optimization problem was also measured. The fact is that before solving a problem formulated in the form of \todolink cvxpy converts it into a canonical form, which most conic solvers work with. For convenience, the plots from these images are duplicated on a logarithmic scale.
 
@@ -689,6 +689,9 @@ Summarizing the numerical tests described above, we can conclude the following:
 \end{itemize}
 
 \subsection{Custom assembling performance}
+
+In this section, we analyze the effectiveness of the implementation of the custom assembly approach regarding the classical one and depending on the mesh density. A series of numerical tests was performed based on the original cylinder expansion problem using the von Mises criterion. Each test corresponds to a finite element mesh, data of which are presented in the table~\ref{tab:custom_assembling_tests}. 
+
 \begin{table}[H]
 	\centering
 	\begin{tabular}{|cccc|}
@@ -706,16 +709,28 @@ Summarizing the numerical tests described above, we can conclude the following:
     \label{tab:custom_assembling_tests}
 \end{table}
 
+The figure~\ref{fig:custom_assembling_analysis} shows the dependence of the total running time of the program on different meshes (as the mesh number increases, its density increases as well). Using 'JIT overhead', we indicated the compilation time of python code written using the numba package.
+
 \begin{figure}[H]
     \center
     \includegraphics[width=0.7\linewidth]{img/custom_assembling_tests.png}
     \caption{Time performance of the custom assembling approach in comparison with the classical one}
-    \label{fig:conic_solvers}
+    \label{fig:custom_assembling_analysis}
 \end{figure}
+
+The results of the numerical experiment show that the compilation time of JIT overhead is an essential part of the total running time of the program for low-density meshes. At the same time, as the mesh density increases, the ratio of the compilation time to the total running time of the program tends to zero. This is possible due to the fact that the compilation of numba code occurs once during the first iteration of the Newton method. After that, the program uses the already compiled code throughout the entire modeling process.
+
+From this we can conclude that for complex nonlinear problems, as well as those where the use of a mesh with a large number of elements is required, the compilation time is negligible compared with the total running time of the program. At the same time, this approach is only slightly inferior in time to the classical one.
 
 \newpage
 \section{Discussion}
 
+\todounderline{general talk}
+\todounderline{about benefits of custom assembling approach}
+\todounderline{about benefits of plasticity + conic optimization}
+\todounderline{oprimization problem formulation}
+\todounderline{perspectives: custom assembling + SNESQN + cvxpygen}
+\todounderline{perspectives: derivate() from cvxpy to C}
 
 
 \newpage
