@@ -169,13 +169,24 @@ sdf \parencite{Coussy} sdf \parencite{BRUNO2020724} sdf \parencite{Numba2015} sd
 
 \subsection{Theory}
 
-\todounderline{Introduce elasticity notation here}
+In this section, we will describe the mathematical formulation for solving the elastic-plastic body equilibrium problem, the return mapping algorithm and the convex optimization problem in the context of plasticity theory. To simplify further discussions, we will introduce some notation here. 
+
+To solve this problem, it is necessary to restore the stress field. To do this, it is necessary to solve a system of differential equations describing the equilibrium of a solid body under the assumption of small deformations. We will use the notation for the stress tensor $\uusigma$ with components $\sigma_{ij}$ in the Cartesian coordinate system $\ul{x} = (x, y, z)$. By denote the linear strain tensor $\varepsilon_{ij}=(\partial u_i/\partial x_j+\partial u_j/\partial x_i)/2$, where $\uu=(u_x, u_y, u_z)$ is a displacement vector.
+
+In this paper, the problems are considered in the plane strain case. This means that the following equalities hold
+\begin{align}
+    & u_z = 0, \\
+    & \varepsilon_{xz} = \varepsilon_{yz} = \varepsilon_{zz} = 0, \\
+    & \sigma_{xz} = \sigma_{yz} = 0.
+\end{align}
+
+We note here that the results of this work can be easily generalized to the three-dimensional case without a plain strain assumption.
 
 \subsubsection{Plasticity}
 
-One of the simplest models describing the nonlinear behavior of solids is an elastic-plastic one. The idea of it is that at a certain moment of loading, irreversible deformations occur. They do not disappear when the external load is removed, as it happens for an elastic body model. Such deformations are called plastic. They arise at the moment when, with an increase in the external load, the values of the stress tensor $\uusigma$ of a solid reach critical ones. These limit values are determined by yield criterion, the explicit form of which defines various elastic-plastic models. In this paper, we focused on models defined by von Mises, Drucker-Prager and Rankine yield criteria. 
+One of the simplest models describing the nonlinear behavior of solids is an elastic-plastic one. The idea of it is that at a certain moment of loading, irreversible deformations occur. They do not disappear when the external load is removed, as it happens for an elastic body model. Such deformations are called plastic. They arise at the moment when, with an increase in the external load, the values of the stress tensor reach critical ones. These limit values are determined by yield criterion, the explicit form of which defines various elastic-plastic models. In this paper, we focused on models defined by von Mises, Drucker-Prager and Rankine yield criteria. 
 
-When considering plastic models, a number of hypotheses about the behavior of the material based on observations from experiments are traditionally introduced. One of such hypotheses is the additive decomposition of total strains $\uueps$
+Considering plastic models, a number of hypotheses about the behavior of the material based on observations from experiments are traditionally introduced. One of such hypotheses is the additive decomposition of total strains $\uueps$
 \begin{equation}\label{eqn:eps_dec}
     \uueps = \uueps^e + \uueps^p,
 \end{equation}
@@ -183,11 +194,13 @@ where $\uueps^e$ and $\uueps^p$ are elastic and plastic strains respectively.
 
 Isotropic linear elastic behavior is expressed as the following dependency
 \begin{equation}
-    \uusigma = \uuuuC{} : \uueps^e,
+    \uusigma = \uuuuC{} : \uueps^e = \left( 3k\uuuuJ + 2\mu\uuuuK \right) : \uueps^e,
 \end{equation}
-where $\uuuuC{}$ is the fourth-order stiffness tensor.
+where $\uuuuC{}$ is the fourth-order stiffness tensor, $k = (3\lambda + 2\mu)$ is a bulk modulus, $\lambda$ and $\mu$ are the first and the second Lamé parameters, $\uuuuK$ and $\uuuuJ$ are the forth-order tensors associated with the deviatoric operator and a unit tensor respectively.
 
-To obtain plastic deformations, the stress point must not only be on the yield contour defining by yield function $f$ as an explicite expression of a yield criterion. When the stress point only touches the yield contour and immediately moves inward again, plastic flow will not occur. Plastic straining will take place if and only if the yield function f vanishes:
+To obtain plastic deformations, the stress point must not only be on the yield contour defining by yield function $f$ as an explicite expression of a yield criterion. 
+% When the stress point only touches the yield contour and immediately moves inward again, plastic flow will not occur. 
+Plastic straining will take place if and only if the yield function f vanishes:
 \begin{equation}
     f(\uusigma) = 0
 \end{equation}
@@ -227,31 +240,27 @@ Thus, taking into account the described above assumptions \ref{eqn:eps_dec}--\re
     \partial\Omega_\text{N} &: \uusigma \cdot \un = q \cdot \un, \label{eqn:bc_Neumann} \\
     \partial\Omega_\text{D} &: \uu = \uu_D, \label{eqn:bc}
 \end{align}
-where the equilibrium equation~\ref{eqn:div} is defined in the hole domain $\Omega$ as well as the constitutive equation~\ref{eqn:constitutive_law} of linear elasticity, $\un$ is a surface normal to the boundary $\partial\Omega_\text{N}$, where we apply Neuman boundary conditions~\ref{eqn:bc_Neumann}. Dirichlet boundary conditions are defined by the displacements equality~\ref{eqn:bc} on the boundary $\partial\Omega_\text{D}$.
+where the equilibrium equation~\ref{eqn:div} is defined in the domain $\Omega$ as well as the constitutive equation~\ref{eqn:constitutive_law} of linear elasticity, $\un$ is a surface normal to the boundary $\partial\Omega_\text{N}$, where we apply Neuman boundary conditions~\ref{eqn:bc_Neumann}. Dirichlet boundary conditions are defined by the displacements equality~\ref{eqn:bc} on the boundary $\partial\Omega_\text{D}$.
 
-We call the described above system of partial differential equations~\ref{eqn:div}--\ref{eqn:bc} and assumptions~\ref{eqn:eps_dec}--\ref{eqn:KKT_conditions} elastoplastic constitutive equations. In the next part, we will talk in detail about the numerical solutions of these equations and offer an alternative to the classical approaches.
+We call the described above system of partial differential equations~\ref{eqn:div}--\ref{eqn:bc} and assumptions~\ref{eqn:eps_dec}--\ref{eqn:KKT_conditions} elastoplastic constitutive equations. In the next part, we will talk in detail about the numerical solutions of these equations.
 % \begin{equation}
 %     \dot{p} = \dot{\varepsilon}^{p, \text{eq}} = \sqrt{\frac{2}{3}\uueps^p : \uueps^p}
 % \end{equation}
 
 \subsubsection{Numerical solution of elastoplastic constitutive equations}
 
-The processes considered here are quasi-static, so the solution of this system is carried out in stages. In the process of solving elastoplastic constitutive equations, we load the body gradually increasing the loading at each step.
-\todounderline{Finish this}
-On every loading step we solve the system~\ref{eqn:eps_dec}--\ref{eqn:bc} using the finite element and Newton methods.
+The processes considered here are quasi-static, so the solution of this system is carried out in stages. In the process of solving elastoplastic constitutive equations, we load the body gradually increasing the loading at each step. On every loading step we solve the system~\ref{eqn:eps_dec}--\ref{eqn:bc} using the finite element and Newton methods. 
 
-We need to define a week formulation of our problem to use the finite element method. First of all we introduce here the space of admissible displacements $V$
+First of all, we need to define a week formulation of our problem to use the finite element method. So we introduce here the space of admissible displacements $V$
 \begin{equation}
     V = \{\uu = (u_x, u_y) \in H^1(\Omega) \, | \, \uu = \uu_D \text{ on } \partial\Omega_D \},
 \end{equation}
-where $H^1(\Omega)$ is the first-order Sobolev space.
-
-The variational problem will look like this 
+where $H^1(\Omega)$ is the first-order Sobolev space. The variational problem will look like this 
 \begin{align}
     & \text{Find } \uu \in V \text{ such that,} \label{eqn:var_from_1} \\ 
     & R(\uu) = \int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x - F_\text{ext} = 0, \quad \forall \uv \in V \label{eqn:var_from_2},
 \end{align}
-where $F_\text{ext} = q\int\limits_{\partial\Omega_\text{N}}\un \cdot \uv \, \md x$ is an external force acting on the cylinder surface.
+where $F_\text{ext}$ is an external force acting on the $\partial\Omega_N$.
 % or like this
 % \begin{align}
 %     & \text{Find } \uu \in V \text{ such that,} \label{eqn:var_from_R_1} \\ 
@@ -259,34 +268,58 @@ where $F_\text{ext} = q\int\limits_{\partial\Omega_\text{N}}\un \cdot \uv \, \md
 % \end{align}
 % where $R(\uu) = \int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x - q\int\limits_{\partial\Omega_\text{N}}\un \cdot \uv \, \md x$. 
 
-Solving the variational equation~\ref{eqn:var_from_2} is a nonlinear
-problem, that can be solved through successive linearizations using the
+The variational equation~\ref{eqn:var_from_2} is a nonlinear, that can be solved through successive linearizations using the
 Newton algorithm. The linearized problem looks like this one
 \begin{align}
-    & J(\uu) = R^\prime(\uu) = -R(\uu) \\
-    & \int\limits_\Omega \left(\frac{\partial\uusigma(\uueps(\uu))}{\partial\uueps} : \uueps(\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x + F_\text{ext}
+    & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:lin_var_from_1} \\ 
+    & \int\limits_\Omega \left(\frac{\partial\uusigma(\uueps(\Delta\uu))}{\partial\uueps} : \uueps(\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x + F_\text{ext} \label{eqn:lin_var_from_2},
+    % & J(\uu) = R^\prime(\uu) = -R(\uu), \\
 \end{align}
-The general algorithm for solving the original problem looks like this. \todounderline{Change this paragraph} At each loading step, we solve a problem~\ref{eqn:var_from_1}--\ref{eqn:var_from_2} using the Newton method, where at each Newton iteration, the numerical value of the displacements $\uu$ is calculated using the finite element method for the variational problem~\ref{eqn:var_from_1}--\ref{eqn:var_from_2}. Now it is necessary to describe the stress calculation algorithm of $\uusigma(\uu)$ in the variational form~\ref{eqn:var_from_1} for each iteration.
+% where we define $J(\uu)$ the derivative of $R(\uu)$ with respect to $\uu$.
+% The general algorithm for solving the original problem looks like this. \todounderline{Change this paragraph} 
+At each loading step $n+1$, we solve the problem~\ref{eqn:var_from_1}--\ref{eqn:var_from_2} using the Newton method, where at each iteration, the numerical value of the displacements increment $\Delta\uu$ is calculated using the finite element method for the variational problem~\ref{eqn:lin_var_from_1}--\ref{eqn:lin_var_from_2}. Now it is necessary to describe the nonlinear behavior of the stress tensor $\uusigma(\uu)$ and its derivative.
 
-Here we write down the equations in its discrete form, where we use a one-point Euler forward integration rule for "time" derivatives:
+Here we introduce a quite common algorithm solving the elasto-plastic problems: the return-mapping procedure. It consists in finding a new stress $\uusigman$ and plastic strain $p_{n+1}$ verifying the current plasticity condition from a previous stress $\uusigma_{n}$ and plastic strain $p_n$ and an increment of total deformation $\Delta\uueps$. The hole procedure checks, if an elastic trial stress $\uusigmanelas$ goes beyond the boundary of the yield surface, in other words if $f(\sigmaeqnelas, p_n) > 0$, then the stress tensor and the plastic strain should be corrected by projecting them on the surface $f(\uusigma, p) = 0$. 
+
+We write down the equations~\ref{eqn:eps_dec}--\ref{eqn:KKT_conditions} in its discrete form, where we use a one-point Euler forward integration rule for "time" derivatives:
 \begin{align}
-    & \uueps_{n+1}^e = \uueps_{n}^e - \Delta\uueps - \Delta\lambda\frac{\partial f}{\partial \uusigma}(\uusigmanelas, p_n), \label{eqn:eps_e_disc} \\
-    & \uusigman = \uusigmanelas - \Delta\uusigma, \\
     & \uusigmanelas = \uusigma_n + \uuuuC{} : \Delta\uueps \\
-    & p_{n+1} = p_n - \Delta\lambda\frac{\partial f}{\partial p}(\uusigmanelas, p_n), \label{eqn:p_disc} \\
+    % & \uueps_{n+1}^e = \uueps_{n}^e - \Delta\uueps - \Delta\lambda\frac{\partial f}{\partial \uusigma}(\uusigmanelas, p_n), \label{eqn:eps_e_disc} \\
+    & \uusigman = \uusigmanelas - \Delta\uusigma, \\
+    & p_{n+1} = p_n - \Delta p \\%\Delta\lambda\frac{\partial f}{\partial p}(\uusigmanelas, p_n), \label{eqn:p_disc} \\
     & \Delta\lambda \geq 0, \quad f(\uusigman, p_{n+1}) \leq 0, \quad \Delta\lambda\cdot f(\uusigman, p_{n+1}) = 0, \label{eqn:KKT_disc}
 \end{align}
-where the increment $\Delta\uueps$ depends on the displacement $\Delta\uu$ calculated on a current loading step.
+where the increment $\Delta\uueps$ depends on the displacement $\Delta\uu$ calculated on a current loading step, $\Delta\uusigma$ and $\Delta p$ are the stress and plastic strain corrections respectively. Increments $\Delta\uusigma, \Delta p$ and $\Delta\lambda$ can be found using the second Newton method, the local one.
 
-We rewrite the weak formulation~\ref{eqn:var_from_1}--\ref{eqn:var_from_2} in a discret form:
+We write out a discret form of the variational problem~\ref{eqn:var_from_1}--\ref{eqn:var_from_2}:
 \begin{align}
-    & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:var_from_1_disc} \\ 
-    & \int\limits_\Omega\uusigman(\Delta\uu) : \uueps(\uv) \, \md x - q_{n+1}\int\limits_{\partial\Omega_\text{N}}\un \cdot \uv \, \md x = 0, \quad \forall \uv \in V \label{eqn:var_from_2_disc}
+    & \text{Find } \uu_{n+1} \in V \text{ such that,} \label{eqn:var_disc_from_1} \\ 
+    & R(\uu_{n+1}) = \int\limits_\Omega\uusigma(\uu_{n+1}) : \uueps(\uv) \, \md x - F_{n+1}^\text{ext} = 0, \quad \forall \uv \in V \label{eqn:var_disc_from_2},
 \end{align}
+and its linearized version~\ref{eqn:lin_var_from_1}--\ref{eqn:lin_var_from_2} by denoting the derivate $\frac{\partial\uusigma}{\partial\uueps}$ by $\uuuuC{}_{\text{tang}}$:
+\begin{align}
+    & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:lin_var_disc_from_1} \\ 
+    & \int\limits_\Omega \left(\uuuuC{}_{n+1}^\text{tang} : \uueps(\Delta\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma_n : \uueps(\uv) \, \md x + F^\text{ext}_{n+1} \label{eqn:lin_var_disc_from_2},
+\end{align}
+where $\uuuuC{}_{n+1}^{\text{tang}}$ is a the forth-rank tangent stiffness tensor.
 
-It is worth noting that Newton's method requires calculating the derivative $\frac{\partial \uusigman}{\Delta\uu}$, which can become a significant obstacle in solving a specific plasticity problem. An alternative to it may be the quasi-Newton method, which approximates the first derivative numerically. So we don't need the explicit expression of the derivative.
+In total we follow the next steps to solve elastoplastic constitutive equations~\ref{eqn:eps_dec}--\ref{eqn:bc} of the original problem
+\begin{enumerate}
+    \item to divide the loading on steps (an external loop)
+    \item to solve the variational problem~\ref{eqn:var_from_1}--\ref{eqn:var_from_2} and to find the current displacement $\uu_{n+1}$ using the Newton method on every loading step (an internal loop)
+    \item to solve the linearized problem~\ref{eqn:lin_var_disc_from_1}--\ref{eqn:lin_var_disc_from_2} and to find the displacement increment $\Delta\uu$ using finite element method on every Newton iteration
+    \item to carry out the return-mapping procedure and to find $\uusigman$ and $p_{n+1}$ in Gauss nodes (a middle loop)
+    \item to find increments $\Delta\uusigma, \Delta p$ and $\Delta\lambda$ using the second Newton method (a bottom loop)
+\end{enumerate}
 
-As mentioned earlier, every model of plasticity is determined by the yield criterion. The equations~\ref{eqn:eps_e_disc} and~\ref{eqn:p_disc} are written out for the particular case when the function $f$ is smooth, so its gradient exists. For some special cases, depending on the type of function $f$, it is possible to write explicit expressions for $\Delta\lambda, \Delta\sigma, \frac{\partial f}{\partial \uusigma}, \frac{\partial f}{\partial p} \text{ and } \frac{\partial \uusigman}{\Delta\uu}$, which will be shown in this work later on using the example of one problem. Therefore, the question arises: what should we do in cases where the function $f$ is not smooth enough to apply the return-mapping procedure described above? For example, the Rankine criterion requires eigenvalues of $\uusigman$, explicit expressions of which cannot be easily obtained in the three-dimensional case. The solution may be to reformulate the original problem in terms of the convex optimization problem, which is the subject of the next chapter.
+As can be seen from the described algorithm, modeling of plastic behavior of solids requires significant numerical resources. Fortunately, for some special cases, depending on the type of function $f$, it is possible to write explicit expressions for $\Delta\lambda, \Delta\uusigma, \Delta p,  \text{ and } \uuuuC{}_{n+1}^\text{tang}$, which will be shown in this work later on using the example of one problem. Thus the last step of the algorithm can be skipped.
+
+% It is worth noting that Newton's method requires calculating the derivative $\frac{\partial \uusigman}{\Delta\uu}$, which can become a significant obstacle in solving a specific plasticity problem. An alternative to it may be the quasi-Newton method, which approximates the first derivative numerically. So we don't need the explicit expression of the derivative.
+
+% As mentioned earlier, every model of plasticity is determined by the yield criterion.  The equations~\ref{eqn:eps_e_disc} and~\ref{eqn:p_disc} are written out for the particular case when the function $f$ is smooth, so its gradient exists.
+
+This algorithm works correctly when the function f is smooth, i.e. its gradient exists. Therefore, the question arises: what should we do in cases where the function $f$ is not smooth enough to apply the return-mapping procedure described above? For example, the Rankine criterion requires eigenvalues of $\uusigman$, explicit expressions of which cannot be easily obtained in the three-dimensional case. The solution may be to reformulate the original problem in terms of the convex optimization problem, which is the subject of the next chapter.
+
 
 \subsubsection{Plasticity using convex optimization}
 
@@ -358,15 +391,17 @@ In order to demonstrate our ideas on a concrete example, we chose a cylinder exp
 \end{align}
 
 The von Mises criterion was chosen as the yield criterion, taking into account linear isotropic hardening
-\begin{equation}
+\begin{equation}\label{eqn:cylinder_von_mises}
     f(\uusigma) = \sqrt{\frac{3}{2} \uus : \uus} - \sigma_0 - Hp \leq 0
 \end{equation}
 
 The weak formulation of the problem~\ref{eqn:cylinder_div}--\ref{eqn:cylinder_bc} looks like this
-\begin{equation}
-    \label{eqn:cylinder_var}
-    \int\limits_\Omega\uusigman(\Delta\uu) : \uueps(\uv) \, \md x - q_{n+1}\int\limits_{\partial\Omega_\text{internal}}\un \cdot \uv \, \md x = 0, \quad \forall \uv \in V.
-\end{equation}
+\begin{align}
+    & \text{Find } \uu \text{ such that} \label{eqn:cylinder_var_1} \\
+    & \int\limits_\Omega\uusigman(\uu) : \uueps(\uv) \, \md x - q_{n+1}\int\limits_{\partial\Omega_\text{internal}}\un \cdot \uv \, \md x = 0, \quad \forall \uv \in V. \label{eqn:cylinder_var_2}
+\end{align}
+It will be progressively increased from 0 to $q_\text{lim} = \frac{2}{\sqrt{3}}\sigma_0\log{\frac{R_e}{R_i}}$ which is the analytical collapse load for a perfectly-plastic material, where $R_e$ and $R_i$ are the external and internal radii of the cylinder respectively.
+
 \begin{figure}[H]
     \begin{minipage}[h]{0.5\linewidth}
         \center{\includegraphics[width=0.7\linewidth]{img/geometry.png} \\ Geometry}
@@ -379,29 +414,32 @@ The weak formulation of the problem~\ref{eqn:cylinder_div}--\ref{eqn:cylinder_bc
     \label{fig:domain}
 \end{figure}
 
-In this particular case, the solution of the equilibrium problem of an elastic-plastic body can be found analytically. A detailed conclusion of a elastic-plastic model can be found in~\cite{bonnet:hal-01083772}, and the implementation in the form of program code for Fenics 2019 is located on~\cite{bleyer2018numericaltours}. Here we will limit ourselves to the relations already deduced
+In this particular case, the solution of the equilibrium problem of an elastic-plastic body can be found analytically. A detailed conclusion of a elastic-plastic model can be found in~\parencite{bonnet:hal-01083772}, and the implementation in the form of program code for Fenics 2019 is located on~\parencite{bleyer2018numericaltours}. Here we will limit ourselves to the relations already deduced
 \begin{align}
     &\Delta p = 
     \begin{cases}
         \frac{1}{3\mu + H}, & \text{if } f_\text{elas} \geq 0,\\
         0, & \text{otherwise},
-    \end{cases} \\
-    &\uusigman = \uusigmanelas - \beta\uusn,
+    \end{cases} \label{eqn:dp_von_mises}\\
+    &\Delta\uusigma = \beta\uusn, \label{eqn:dsigma_von_mises}
 \end{align}
 where $\beta = \frac{3\mu}{\sigmaeqnelas}\Delta p$.
 
 The stress derivative is written with the following formula
 \begin{equation}
-    \dfrac{\md\uusigman}{\md\uuDeltaeps} = \uuuuC{\text{tang}} = \uuuuC{} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \uuN \otimes \uuN - 2\mu\beta\uuuuDEV 
+    \dfrac{\md\uusigman}{\md\uuDeltaeps} = \uuuuC{}_{n+1}^{\text{tang}} = \uuuuC{} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \uuN \otimes \uuN - 2\mu\beta\uuuuJ \label{eqn:C_tang_von_mises}
 \end{equation}
 where $\uuN = \frac{\uus}{\uusigmanelas}$.
 
-\todounderline{Write more details about the problem. Mention Drucker-Prager model. Mention exact values of problem parameters.}
+So we can explicitly write out the linearization of the variational problem~\ref{eqn:cylinder_var_1}--\ref{eqn:cylinder_var_2}
+\begin{align}
+    & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:cylinder_lin_var_from_1} \\ 
+    & \int\limits_\Omega \left( \uuuuC{}_{n+1}^\text{tang} : \uueps(\Delta\uu) \right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma_n : \uueps(\uv) \, \md x + q_{n+1}\int\limits_{\partial\Omega_\text{internal}}\un \cdot \uv \, \md x, \quad \forall \uv \in V. \label{eqn:cylinder_lin_var_from_2} 
+\end{align}
 
-So we can rewrite the variable problem~\ref{eqn:cylinder_var} in terms of 
-\begin{equation}
-    \int\limits_\Omega \left( \uuuuC{\text{tang}} : \uueps(\Delta\uu) \right) : \uueps(\uv) \, \md x - q_{n+1}\int\limits_{\partial\Omega_\text{internal}}\un \cdot \uv \, \md x = 0, \quad \forall \uv \in V.
-\end{equation}
+Explicit expressions~\ref{eqn:dp_von_mises}--\ref{eqn:C_tang_von_mises} are possible thanks to the form of von Mises criterion~\ref{eqn:cylinder_von_mises}. Similar expressions can be obtained for other criteria. As part of this work, a code has been written that allows to work with the plasticity of Drucker-Prager. A detailed derivation of similar expressions in this case can be found in the appendix section \ref{appendix:DP}.
+
+Now we have at our disposal everything necessary for the successful modeling of the von Mises elasto-plasticity. In the next part, we will talk in detail about ways to solve this problem using various approaches via the FenicsX and cvxpy libraries.
 
 \subsection{Development}
 
@@ -612,7 +650,232 @@ Note that the optimization problem is solved $\left\lfloor N_q / N_\text{patch}\
 
 \subsection{Performance}
 
-\todounderline{Copy from readme about custom assembling, numba, etc}
+The second part of this paper discusses strategies to improve the performance of the described above approaches solving plasticity problems. Before describing these ones in detail, we will first talk about the obstacles, that we encountered during the development of the methods presented in the first part of this research. 
+
+In the particular case of modeling an elastic-plastic material defined by the von Mises yield criterion, we explicitly wrote down the variational formulation of \todolink. Obviously, the dependence is nonlinear in nature, but this is just one example where UFLx features are sufficient to solve the problem. There are other models where the stress tensor $\uusigma$ is difficult to represent explicitly. Let us show you some examples
+
+\begin{itemize}
+    % \item[$\bullet$] $\uusigma = \uuuuC{} : (\uueps - \uueps^p)$
+    \item[$\bullet$] $\uusigma(\underline{u}) = f(\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III})$,
+    \item[$\bullet$] $\uusigma(\underline{u}) = \underset{\alpha}{\operatorname{argmin}}\, g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
+\end{itemize}
+where $\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III}$ are eigenvalues of $\underline{\underline{\varepsilon}}$ and $g$ is some scalar function.
+
+% In addition to the above, we note that the convex plasticity approach could also be implemented in the assembly process 
+
+% Find $\underline{u} \in V$, such that
+
+% $$ F(\underline{u}) = \int_\Omega \uusigma(\underline{u}) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{f} \underline{v} dx = 0 \quad \forall \underline{v} \in V,$$
+% where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFLx. Let us show you some examples
+
+As seen in the second example, $\uusigma(\underline{u})$ can also implicitly depend on the value of other scalar, vector or even tensorial quantities ($\alpha$ here). The latter do not necessarily need to be represented in a finite-element function space. They shall just be computed during the assembling procedure when evaluating the expression $\uusigma(\underline{u})$ pointwise.
+
+Although we use the quasi-Newton method to find the solution of \todolink, which allows us to bypass the exact calculation of the derivative of $\uusigma$ with respect to $\underline{u}$, we would like to have a more reliable way to solve the problem in the case when we know the expression of the derivative (as for example for von Mises and Drucker-Prager plasticity models), but it is difficult to express it using UFLx tools. Otherwise we have a method that is able to approximate the derivative more accurately (as, for example, the \mypython{derivative()} method of the cvxpy package does). Thus, it is necessary to have a functionality which will allow to do a simultaneous calculation of $\uusigma$ and its derivative during assembling procedure regardless of the calculation method.
+
+% In both cases, custom assembling would significantly speed up calculations.
+
+In addition to the inconveniences described above, we are faced with the problem of excessive memory allocation. For example, in the classic approach \todolink, we are forced to save global variables $\beta$ and $\uuN$. If there is a mesh containing $N_\text{elements}$ elements, we have to allocate memory for a vector with the size $N_\text{elements}*3$ for the scalar field $\beta$ from \mypython{W0} finite space and another one with the size $N_\text{elements}*3*4$ for the vector field $\uuN$ (in Voigt notation) from \mypython{W} finite space. At the same time they are intermediate variables, necessary only for the calculation of the stress tensor and its derivative. So we would like to avoid such a waste of memory.
+
+\todounderline{Write about global Ctang?}
+
+% In addition, in order to use a standard Newton method to find the solution of $F(\underline{u})=0 $, we also need to compute the derivative of $\uusigma $ with respect to $\underline{u} $. The latter may also depend on some internal variables $\alpha $ of $\uusigma $. Thus, it is necessary to have a fonctionality which will allow to do a simultaneous calculation of $\uusigma$ and its derivative during assembling procedure.
+
+% In practice, in the previous examples $\ \uusigma $ depends directly on $\ \underline{\underline{\varepsilon}} = \frac{1}{2}(\nabla \underline{u} + \nabla \underline{u}^T) $. As a result, it is more natural to consider the non-linear expression as a function of $\ \underline{\underline{\varepsilon}} $ directly, provide an expression for $\ \dfrac{d\uusigma}{d\underline{\underline{\varepsilon}}} $ and evaluate $\ \dfrac{d\uusigma}{d\underline{u}} $ by the chain rule (letting UFLx handle the $\ \dfrac{d\underline{\underline{\varepsilon}}}{d\underline{u}} $ part).
+
+As the result we require the following features to increase capabilities of the code implemented in the first part of this project:
+\begin{enumerate}
+    \item To define nonlinear expressions of variational problems in more complex way than it's allowed by UFLx
+    \item To let an "oracle" provide values of such an expression and its derivative(s)
+    \item To call this oracle on-the-fly during the assembly to avoid unnecessary loops, precomputations and memory allocations
+\end{enumerate}
+
+Next sections describe our own view of these features implementation.
+
+\subsubsection{Custom assembling}
+
+Following the concept of the custom assembler \parencite{test_custom_assembler}, which uses the power of \mypython{numba} and \mypython{cffi} python libraries, we implemented our own version of custom assembler, where we can change the main loop of the assembling procedure.
+
+There are several essential elements of the algorithm to be mentioned. First of all, we would like to introduce a concept of \mypython{CustomExpression}, which is essential for our study. Let us consider the next simple variational problem 
+$$ \int_\Omega g \uu \cdot \uv dx, \quad \forall \underline{v} \in V, $$
+where $\underline{u}$ is a trial function, $\underline{v}$ is a test function and the function $g$ is a mathematical expression. For this moment we must use \mypython{fem.Function} class to implement this variational form. Knowing the exact UFLx expression of $g$ we can calculate its values on every element using the interpolation procedure of \mypython{fem.Expression} class. So we save all values of $g$ in one global vector. The goal is to have a possibility to calculate $g$ expression, no matter how difficult it is, in every element node (for instance, in every gauss point, if we define $g$ on a quadrature element) during the assembling procedure. So, we introduce a new entity named as \mypython{CustomExpression}. It
+\begin{enumerate}
+    \item inherits \mypython{fem.Function}
+    \item contains a method \mypython{eval}, which will be called inside of the assemble loop and calculates the function local values
+\end{enumerate}
+
+Besides \mypython{CustomExpression} we need an other entity. Every \mypython{fem.Function} object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. Let us consider the previous variational form, where $g$ contains its local-element values now. If there is one local value of $g$ (only 1 gauss point), the use of the \mypython{fem.Constant} entity would be enough, but it is a particular case. In general, we are dealing with quadrature functional spaces of arbitrary degree (for example, \mypython{W0} or Q2 space from the first part). We need to store different local values of $g$ in every gauss point. So we introduce a concept of \mypython{DummyFunction} (or `ElementaryFunction`?), which 
+\begin{enumerate}
+    \item inherits \mypython{fem.Function}
+    \item allocates the memory for local values only
+    \item can be updated during assembling procedure
+\end{enumerate}
+
+\subsubsection{Examples}
+
+We implemented an elasticity problem to explain our ideas by simple example. Let's consider a beam stretching with the left side fixed. On the other side we apply displacements. 
+\begin{align}
+    & \text{Find } \underline{u} \in V \text{ s.t.} \\
+    & \int_\Omega \uusigma(\underline{\underline{\varepsilon}}(\underline{u})) : \underline{\underline{\varepsilon}}(\underline{v}) d\underline{x}  = 0 \quad \forall \underline{v} \in V,
+\end{align}
+with following boundary conditions
+\begin{align}
+    & (0, 0) : u_y = 0, \\
+    & \partial\Omega_\text{left} : u_x = 0, \\
+    & \partial\Omega_\text{right} : u_x = t \cdot u_\text{bc},
+\end{align}
+where $u_\text{bc}$ is a maximal displacement on the right side of the beam, $t$ is a parameter varying from 0 to 1, and where $\uusigma(\underline{\underline{\varepsilon}})$ is our user-defined "oracle". Here we use a simple elastic behaviour:
+\begin{equation}
+    \uusigma(\underline{\underline{\varepsilon}}) = \uuuuC{}:\underline{\underline{\varepsilon}},
+\end{equation}
+and for which the derivative is:
+\begin{equation}
+    \dfrac{d\uusigma}{d\underline{\underline{\varepsilon}}} = \uuuuC{}.
+\end{equation}
+
+Let's focus on the key points. In this "naive" example the derivative is constant, but in general non-linear models, its value will directly depend on the local value of $\underline{\underline{\varepsilon}}$. We would like to change this value at every assembling step and to avoid additional memory allocation. As it's the stress tensor derivative, it's defined on quadrature elements. Thus, in our terms, it would be a \mypython{DummyFunction}. Obviously, $\uusigma$ is the \mypython{CustomExpression}, which depends on $\underline{\underline{\varepsilon}}$. 
+
+The code below initiates variables associated with $\uuuuC{}$ and $\uusigma$ respectively:
+\begin{pythoncode}
+    q_dsigma = ca.DummyFunction(VQT, name='stiffness') # tensor C
+    q_sigma = ca.CustomExpression(VQV, eps(u), [q_dsigma], get_eval)  # sigma_{n+1}
+\end{pythoncode}
+
+In the \mypython{CustomExpression} constructor we observe three arguments. The first one is the UFL-expression of its variable ($\uueps$ here). It will be compiled via \mypython{ffcx} and will be sent as "tabulated" expression to a numba (compilable) function, which performs the calculation of \mypython{q_sigma}. The second argument is a list of \mypython{q_sigma} coefficients (\mypython{fem.Function} or \mypython{DummyFunction}), which takes a part in calculations of \mypython{q_sigma}. The third argument contains the function \mypython{get_eval} generating a \mypython{CustomExpression} method \mypython{eval}, which will be called during the assembling. It describes every step of local calculation of $\uusigma$. In this linear elasticity example it simply multiplies the stiffness tensor $\bC$ and the strain vector $\beps$:
+
+\begin{pythoncode}
+    def get_eval(self:ca.CustomFunction):
+        tabulated_eps = self.tabulated_input_expression
+        n_gauss_points = len(self.input_expression.X)
+        local_shape = self.local_shape
+        C_shape = self.stiffness.shape
+
+        @numba.njit(fastmath=True)
+        def eval(sigma_current_local, coeffs_values, constants_values, coordinates, local_index, orientation):
+            epsilon_local = np.zeros(n_gauss_points*3, dtype=PETSc.ScalarType)
+
+            C_local = np.zeros((n_gauss_points, *C_shape), dtype=PETSc.ScalarType)
+            
+            sigma_local = sigma_current_local.reshape((n_gauss_points, *local_shape))
+
+            tabulated_eps(ca.ffi.from_buffer(epsilon_local), 
+                        ca.ffi.from_buffer(coeffs_values), 
+                        ca.ffi.from_buffer(constants_values), 
+                        ca.ffi.from_buffer(coordinates), ca.ffi.from_buffer(local_index), ca.ffi.from_buffer(orientation))
+            
+            epsilon_local = epsilon_local.reshape((n_gauss_points, -1))
+
+            for q in range(n_gauss_points):
+                C_local[q][:] = get_C() #change DummyFunction here
+                sigma_local[q][:] = np.dot(C_local[q], epsilon_local[q]) 
+            
+            sigma_current_local[:] = sigma_local.flatten()
+
+            
+            return [C_local.flatten()]
+        return eval
+\end{pythoncode}
+
+Besides the local implementation of new entities we need to change the assembling procedure loop to describe explicitly the interaction between different coefficients of linear and bilinear forms. It allows us to write a quite general custom assembler, which will work for any kind non-linear problem. Thus we have to define two additional numba functions to calculate local values of forms kernels coefficients (see the code below).
+
+\begin{pythoncode}
+    @numba.njit(fastmath=True)
+    def local_assembling_b(cell, coeffs_values_global_b, coeffs_coeff_values_b, coeffs_dummy_values_b, coeffs_eval_b, 
+                           u_local, coeffs_constants_b, geometry, entity_local_index, perm):
+        sigma_local = coeffs_values_global_b[0][cell]
+        
+        output_values = coeffs_eval_b[0](sigma_local, 
+                                         u_local, 
+                                         coeffs_constants_b[0], 
+                                         geometry, entity_local_index, perm)
+    
+        coeffs_b = sigma_local
+    
+        for i in range(len(coeffs_dummy_values_b)):
+            coeffs_dummy_values_b[i][:] = output_values[i] #C update
+    
+        return coeffs_b
+    
+    @numba.njit(fastmath=True)
+    def local_assembling_A(coeffs_dummy_values_b):
+        coeffs_A = coeffs_dummy_values_b[0]
+        return coeffs_A
+\end{pythoncode}
+
+With this "naive" example, we demonstrated the possibility of intervention in the assembly process with ready-made FEniCSx tools, and with the help of compiled functions of the numba library. The implementation of the proposed functionality is effective enough not to change the source code of the FEniCSx library itself.
+
+The following example optimizes the classical approach solving the von Mises plasticity problem \todolink.
+% Plasticity problem
+% The elasticity case is trivial and doesn't show clearly our demands by the described above features. Therefore we present here a standard non-linear problem from our scientific domain - a plasticity one.
+% The full description of the problem and its implementation on a legacy version of FEniCS 2019 is introduced [here] \todolink. Note that for this very specific example, everything can still be expressed in UFL directly. However, in general, this is no longer the case, as one may have to solve a nonlinear equation at each integration point to obtain the expression of stresses and plasticity variables.
+% We focus on the following variational problem only: Find $\underline{\Delta u} \in V$ s.t.
+% $$ \int\limits_\Omega \underline{\underline{\sigma_{n+1}}} (\underline{\underline{\varepsilon}}(\underline{\Delta u})) : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
+% where $\underline{\Delta u}$ is a displacement increment between two load steps, $\uusigma_{n+1}$ is the current stress tensor which depends on the previous stress $\uusigma_n$ and the previous plastic strain $p_n$ and which is implicitly defined as the solution to the following equations:
+We can conclude from this, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\underline{\underline{\Delta\varepsilon}}, \beta, \uuN, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \uuN)$ depend on the common variables $\beta$ and $\uuN$. With the previous implementation, it was necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
+
+In comparison with the elasticity case the \mypython{CustomExpression} \mypython{sig} has more dependent fields. Look at the code below
+
+\begin{pythoncode}
+    C_tang = ca.DummyFunction(QT, name='tangent') # tensor C_tang
+    sig = ca.CustomExpression(W, eps(Du), [C_tang, p, dp, sig_old], get_eval) # sigma_n
+\end{pythoncode}
+As it was expected, the local evaluation of the \mypython{CustomExpression} becomes more complex 
+\begin{pythoncode}
+    def get_eval(self:ca.CustomExpression):
+        tabulated_eps = self.tabulated_input_expression
+        n_gauss_points = len(self.input_expression.X)
+        local_shape = self.local_shape
+        C_tang_shape = self.tangent.shape
+
+        @numba.njit(fastmath=True)
+        def eval(sigma_current_local, sigma_old_local, p_old_local, dp_local, 
+                 coeffs_values, constants_values, coordinates, local_index, orientation):
+            deps_local = np.zeros(n_gauss_points*3*3, dtype=PETSc.ScalarType)
+            
+            C_tang_local = np.zeros((n_gauss_points, *C_tang_shape), dtype=PETSc.ScalarType)
+            
+            sigma_old = sigma_old_local.reshape((n_gauss_points, *local_shape))
+            sigma_new = sigma_current_local.reshape((n_gauss_points, *local_shape))
+
+            tabulated_eps(ca.ffi.from_buffer(deps_local), 
+                          ca.ffi.from_buffer(coeffs_values), 
+                          ca.ffi.from_buffer(constants_values), 
+                          ca.ffi.from_buffer(coordinates), 
+                          ca.ffi.from_buffer(local_index), 
+                          ca.ffi.from_buffer(orientation))
+            
+            deps_local = deps_local.reshape((n_gauss_points, 3, 3))
+
+            n_elas = np.zeros((3, 3), dtype=PETSc.ScalarType) 
+            beta = np.zeros(1, dtype=PETSc.ScalarType) 
+            dp = np.zeros(1, dtype=PETSc.ScalarType) 
+
+            for q in range(n_gauss_points):
+                sig_n = as_3D_array(sigma_old[q])
+                sig_elas = sig_n + sigma(deps_local[q])
+                s = sig_elas - np.trace(sig_elas)*I/3.
+                sig_eq = np.sqrt(3./2. * inner(s, s))
+                f_elas = sig_eq - sig0 - H*p_old_local[q]
+                f_elas_plus = ppos(f_elas)
+                dp[:] = f_elas_plus/(3*mu_+H)
+                
+                sig_eq += TPV # for the case when sig_eq is equal to 0.0
+                n_elas[:,:] = s/sig_eq*f_elas_plus/f_elas
+                beta[:] = 3*mu_*dp/sig_eq
+        
+                new_sig = sig_elas - beta*s
+                sigma_new[q][:] = np.asarray([new_sig[0, 0], new_sig[1, 1], new_sig[2, 2], new_sig[0, 1]])
+                dp_local[q] = dp[0]
+                
+                C_tang_local[q][:] = get_C_tang(beta, n_elas)
+            
+            return [C_tang_local.flatten()] 
+        return eval
+\end{pythoncode}
+
+Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\text{tang}$ on the calculation of the tensor $\uusigma_{n+1}$. The full source code of this examples can be found in the \mypython{assembling_strategies} folder of the repository \todolink .
+
+Finally we developed our own custom assembler which makes use of two new entities. This allows us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FEniCSx features, we can implement our ideas by way of efficient code. 
+% Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
 
 \newpage
 \section{Results}
@@ -752,6 +1015,7 @@ From this we can conclude that for complex nonlinear problems, as well as those 
 % \section*{Annexes}
 \begin{appendices}
     \section{Drucker-Prager material}
+    \label{appendix:DP}
 
     \begin{equation}
         f(\uusigma, p) = \sigma_{\text{eq}} + \alpha \mtr \uusigma - R(p) \leq 0
