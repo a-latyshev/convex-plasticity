@@ -160,9 +160,9 @@ Parmi la grande classe de problèmes d'optimisation convexe, il existe une sous-
 
 Grâce à la modélisation numérique, on peux simuler une variété de processus physiques et extrapoler les résultats. La théorie de la plasticité ne fait pas exception. Parmi les méthodes numériques les plus efficaces, la méthode des éléments finis est reconnue, qui est souvent utilisée pour modéliser le comportement des solides. L'idée de la méthode est d'intégrer des systèmes d'équations aux dérivées partielles sur un domaine discret en résolvant des systèmes d'équations algébriques linéaires. 
 
-Il existe un grand nombre de bibliothèques d'éléments finis de complexité très différente. Parmi l'ensemble des projets open-source, FEniCSx nous convient le mieux en raison de sa simplicité et de sa commodité. Il permet de modéliser en écrivant du code en Python. Cela accélère non seulement le développement, mais donne également accès à un grand nombre d'autres bibliothèques écrites pour ce langage de programmation. Le projet FEniCSx~\parencite{FEniCS2015}--~\parencite{LoggEtal2012} est une combinaison de plusieurs bibliothèques, chacune ayant son propre objectif. 
+Il existe un grand nombre de bibliothèques d'éléments finis de complexité très différente. Parmi l'ensemble des projets open-source, FEniCSx nous convient le mieux en raison de sa simplicité et de sa commodité. Il permet de modéliser en écrivant du code en Python. Cela accélère non seulement le développement, mais donne également accès à un grand nombre d'autres bibliothèques écrites pour ce langage de programmation. Le projet FEniCSx~\parencite{FEniCS2015}--\parencite{LoggEtal2012} est une combinaison de plusieurs bibliothèques, chacune ayant son propre objectif. 
 
-% Par exemple, DOLFINx~\parencite{LoggWells2010}--~\parencite{LoggEtal_10_2012} est l'environnement de calcul de FEniCSx et implémente l'environnement de résolution de problèmes FEniCS en C++ et Python. UFL~\parencite{UFL2014} est un langage spécifique pour la déclaration des discrétisations d'éléments finis des formes variationnelles. Basix~\parencite{BasixJoss} est une bibliothèque d'exécution de définition et de tabulation d'éléments finis. Chacun d'eux fait partie intégrante du processus de development du code scientifique.
+% Par exemple, DOLFINx~\parencite{LoggWells2010}--\parencite{LoggEtal_10_2012} est l'environnement de calcul de FEniCSx et implémente l'environnement de résolution de problèmes FEniCS en C++ et Python. UFL~\parencite{UFL2014} est un langage spécifique pour la déclaration des discrétisations d'éléments finis des formes variationnelles. Basix~\parencite{BasixJoss} est une bibliothèque d'exécution de définition et de tabulation d'éléments finis. Chacun d'eux fait partie intégrante du processus de development du code scientifique.
 
 Le cœur de la bibliothèque FEniCSx est écrit en C$\backslash$C++, mais il existe également une interface pour y accéder le langage de script Python de haut niveau. Les programmes écrits en Python pur perdent leurs performances au profit de leurs analogues du langage C$\backslash$C++. De plus, le cœur de chaque bibliothèque d'éléments finis moderne contient généralement de plusieurs milles de lignes de code, ce qui ralentit le processus de développement de nouvelles fonctionnalités. Heureusement, il existe aujourd'hui un concept de compilation just-in-time (JIT), selon lequel on peut écrire un bloc de code compilé dans un programme écrit en python. Ensuite, on peut l'exécuter et ce code sera plus performant. Ainsi, on peut remplacer les parties critiques d'un programme par des fonctions compilées en JIT. Cela accélère considérablement le processus de développement et augmente les performances de temps des programmes. Il supprime également l'obligation pour l'utilisateur d'une bibliothèque Python particulière d'étudier en détail tout son code source afin d'ajouter une nouvelle fonctionnalité nécessaire à la recherche. Dans ce travail, on utilise la bibliothèque numba~\parencite{Numba2015} à ces fins. 
 
@@ -212,7 +212,7 @@ Among the large class of convex optimization problems, there is a subclass of co
 
 Thanks to numerical modeling, we can simulate a variety of physical processes and extrapolate results. The theory of plasticity is not an exception. Among the most effective numerical methods, the finite element method is recognized, which is often used to model the behavior of solids. The idea of the method is to integrate systems of partial differential equations over a discrete domain by solving systems of linear algebraic equations. 
 
-There is a large number of finite element libraries of very different complexity. Among open-source project, FEniCSx is best suited to us due to its simplicity and convenience. It allows modeling by writing code in Python. This not only speeds up development, but also gives access to countless other libraries written for this programming language. The FEniCSx Project~\parencite{FEniCS2015}~--~\parencite{LoggEtal2012} is a combination of several libraries, each of which has its own purpose. Let's list some of them. DOLFINx~\parencite{LoggWells2010}~--~\parencite{LoggEtal_10_2012} is the computational environment of FEniCSx and implements the FEniCS Problem Solving Environment in C++ and Python. Unified Form Language (UFL)~\parencite{UFL2014} is a domain specific language for declaration of finite element discretizations of variational forms. Basix~\parencite{BasixJoss} is a finite element definition and tabulation runtime library. Each of them is an integral part of the scientific code development process.
+There is a large number of finite element libraries of very different complexity. Among open-source project, FEniCSx is best suited to us due to its simplicity and convenience. It allows modeling by writing code in Python. This not only speeds up development, but also gives access to countless other libraries written for this programming language. The FEniCSx Project~\parencite{FEniCS2015}~--\parencite{LoggEtal2012} is a combination of several libraries, each of which has its own purpose. Let's list some of them. DOLFINx~\parencite{LoggWells2010}~--\parencite{LoggEtal_10_2012} is the computational environment of FEniCSx and implements the FEniCS Problem Solving Environment in C++ and Python. Unified Form Language (UFL)~\parencite{UFL2014} is a domain specific language for declaration of finite element discretizations of variational forms. Basix~\parencite{BasixJoss} is a finite element definition and tabulation runtime library. Each of them is an integral part of the scientific code development process.
 
 The core of the FEniCSx library is written in C$\backslash$C++, but there is also an interface for accessing this functionality in the high-level Python scripting language. Programs written in pure Python lose performance to their analogues from the C$\backslash$C++ language. In addition the core of any modern finite element library usually contains thousands of lines of code, which slows down the process of developing new features. Fortunately, today there is a concept of just-in-time (JIT) compilation. According to it, we can write some compiled block of code in a program written in python. Then we can compile it and this code will be more efficient. Thus, we can replace critical parts of a program with JIT compiled functions. This significantly speeds up the development process and increases the time performance. In this work, we use the numba library~\parencite{Numba2015} for these purposes. 
 
@@ -220,7 +220,7 @@ In the context of this work, changing the assembly process becomes the key to ef
 
 The result of the research is a framework written in Python. It finds a numerical solution to the problem without binding the algorithm to a specific type of yield function. The written code is publicly available at~\parencite{convex-plasticity}. 
 
-In the first part of this manuscript, we present the basics of plasticity theory and the return-mapping algorithm, as well as formulation of the convex optimization problem. After that, we talk about a specific problem of modeling von Mises plasticity, on the example of which we are going to test numerical methods. Then we describe two approaches to solving plasticity problems: the classical one using the most common return-mapping algorithm, and then its application in the context of convex programming. We write out lines of python code necessary to implement these methods using the FEniCSx library. After that, we talk about performance and offer our own functionality that allows us to effect the assembly process without changing the source code of the FEniCSx library. Then we demonstrate the results, discuss them and talk about the prospects of the work done, comparing the proposed methods of plasticity modeling. At the end, the conclusions about the work are presented.
+In the first part of this manuscript, we present the basics of plasticity theory~\eqref{sec:theory:plasticity} and the return-mapping algorithm~\eqref{sec:theory:classical_plasticity}, as well as formulation of the convex optimization problem~\eqref{sec:theory:convex_optimization}. After that, we talk about a specific problem of modeling von Mises plasticity~\eqref{sec:theory:problem_formulation}, on the example of which we are going to test numerical methods. Then we describe two approaches to solving plasticity problems: the classical one using the most common return-mapping algorithm~\eqref{sec:development:classical_approach}, and then its application in the context of convex programming~\eqref{sec:development:convex_plasticity}. We write out lines of python code necessary to implement these methods using the FEniCSx library. After that, we talk about performance and offer our own functionality that allows us to effect the assembly process without changing the source code of the FEniCSx library~\eqref{sec:performance}. Then we demonstrate the results~\eqref{sec:results}, discuss them and talk about the prospects of the work done~\eqref{sec:discussion}, comparing the proposed methods of plasticity modeling. At the end, the conclusions about the work are presented~\eqref{sec:conclusion}.
 
 \newpage
 \section{Context and laboratory presentation}
@@ -244,7 +244,7 @@ Doctor Maurini also specializes in computational mechanics. His current research
 \section{Literature review}
 % \section{Revue de littérature}
 
-This research is mainly based on the work of~\textcite{BRUNO2020724}, where the authors describe in detail the relationship between conic optimization problems and return-mapping algorithms for associative isotropic hardening plasticity. The article contains mathematical formulations of conic optimization problems for special cases of plasticity models, where yield criteria are considered as constraints divided into two groups. The first one contains positive semidefinite yield criteria: Rankine and Mohr-Coulomb. The second group includes second-order cone yield criteria: von Mises and Drucker-Prager. As a result, optimization problems are reduced to a canonical form and algorithms for their solution are proposed. In this work, we use the external cvxpy~\parencite{diamond2016cvxpy}~--~\parencite{agrawal2018rewriting} library, where it is sufficient to formulate an objective function and constraints using library tools to solve the optimization problem. This will allow us to write a single code that solves the original problem without necessity to adapt it to each criterion of plasticity.
+This research is mainly based on the work of~\textcite{BRUNO2020724}, where the authors describe in detail the relationship between conic optimization problems and return-mapping algorithms for associative isotropic hardening plasticity. The article contains mathematical formulations of conic optimization problems for special cases of plasticity models, where yield criteria are considered as constraints divided into two groups. The first one contains positive semidefinite yield criteria: Rankine and Mohr-Coulomb. The second group includes second-order cone yield criteria: von Mises and Drucker-Prager. As a result, optimization problems are reduced to a canonical form and algorithms for their solution are proposed. In this work, we use the external cvxpy~\parencite{diamond2016cvxpy}~--\parencite{agrawal2018rewriting} library, where it is sufficient to formulate an objective function and constraints using library tools to solve the optimization problem. This will allow us to write a single code that solves the original problem without necessity to adapt it to each criterion of plasticity.
 
 There are a large number of solvers for the conic optimization problems. As part of this work, we have selected only three: SCS, ECOS and MOSEK. SCS~\parencite{ocpb:16} is well suited for solving large-scale quadratic convex cone problems. ECOS~\parencite{Domahidi2013ecos} is designed for a second-order cone programming and specifically for embedded applications. It works faster than many conic solvers for small problems. And finally MOSEK~\parencite{mosek} is a commercial one. It works with different types of large-scale tasks. We used an academic license to access it.
 
@@ -257,6 +257,7 @@ Since we are dealing with nonlinear problems. Newton's method is a popular appro
 % \section{Méthodologie}
 
 \subsection{Theory}
+\label{sec:theory}
 
 In this section, we will describe the mathematical formulation for solving the elastic-plastic body equilibrium problem, the return mapping algorithm and the convex optimization problem in the context of plasticity theory. To simplify further discussions, we will introduce some notation here. 
 
@@ -271,6 +272,7 @@ In this paper, the problems are considered in the plane strain case. This means 
 We note here that the results of this work can be easily generalized to the three-dimensional case without a plain strain assumption.
 
 \subsubsection{Plasticity}
+\label{sec:theory:plasticity}
 
 One of the simplest models describing the nonlinear behavior of solids is an elastic-plastic one. The idea of it is that at a certain moment of loading, irreversible deformations occur. They do not disappear when the external load is removed, as it happens for an elastic body model. Such deformations are called plastic. They arise at the moment when, with an increase in the external load, the values of the stress tensor reach critical ones. These limit values are determined by yield criterion, the explicit form of which defines various elastic-plastic models. In this paper, we focused on models defined by von Mises, Drucker-Prager and Rankine yield criteria. 
 
@@ -359,7 +361,7 @@ where $F_\text{ext}(\uv)$ is a linear form corresponding to the applied external
 % \end{align}
 % where $R(\uu) = \int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x - q\int\limits_{\partial\Omega_\text{N}}\un \cdot \uv \, \md x$. 
 
-The variational equation~\eqref{eqn:var_from_2} is a nonlinear, that can be solved through successive linearizations using the
+The variational equation~\eqref{eqn:var_from_2} is nonlinear, that can be solved through successive linearizations using the
 Newton algorithm. The linearized problem looks like this one
 \begin{align}
     & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:lin_var_from_1} \\ 
@@ -368,21 +370,23 @@ Newton algorithm. The linearized problem looks like this one
 \end{align}
 % where we define $J(\uu)$ the derivative of $R(\uu)$ with respect to $\uu$.
 % The general algorithm for solving the original problem looks like this. \todounderline{Change this paragraph} 
-At each loading step $n+1$, we solve the problem~\eqref{eqn:var_from_1}--\eqref{eqn:var_from_2} using the Newton method, where at each iteration, the numerical value of the displacements increment $\Delta\uu$ is calculated using the finite element method for the variational problem~\eqref{eqn:lin_var_from_1}--\eqref{eqn:lin_var_from_2}. Now it is necessary to describe the nonlinear behavior of the stress tensor $\uusigma(\uu)$ and its derivative.
 
-Here we introduce a quite common algorithm solving the elasto-plastic problems: the return-mapping procedure. It consists in finding a new stress $\uusigman = \uusigma(\uu_{n+1})$ and plastic strain $p_{n+1}$ verifying the current plasticity condition from a previous stress $\uusigma_{n}$ and plastic strain $p_n$ and an increment of total deformation $\Delta\uueps$. The whole procedure checks, if an elastic trial stress $\uusigmanelas$ goes beyond the boundary of the yield surface, in other words if $f(\sigmaeqnelas, p_{n+1}) > 0$, then the stress tensor and the plastic strain should be corrected by projecting them on the surface $f(\uusigma, p) = 0$. 
+On every loading step $n+1$, we solve the problem~\eqref{eqn:var_from_1}--\eqref{eqn:var_from_2} and get the displacement $\uu_{n+1}$ using the Newton method, where at each iteration, the numerical value of the displacements increment $\Delta\uu$ is calculated using the finite element method for the variational problem~\eqref{eqn:lin_var_from_1}--\eqref{eqn:lin_var_from_2}. Once the Newton method has converged, we can update the displacement vector $\uu_{n+1} = \uu_n + \Delta\uu$ and move on to the next step. 
+% Now it is necessary to describe the nonlinear behavior of the stress tensor $\uusigma(\uu)$ and its derivative.
 
-We write down the equations~\eqref{eqn:eps_dec}--\eqref{eqn:KKT_conditions} in its discrete form, where we use a one-point Euler backward integration rule for "time" derivatives:
+Let's write down the introduced above problems in its discret forms, but firstly we show the discretized versions of the equations~\eqref{eqn:eps_dec}--\eqref{eqn:KKT_conditions}, where we use a one-point Euler backward integration rule for "time" derivatives:
 \begin{align}
-    & \uusigmanelas = \uusigma_n + \uuuuC{} : \Delta\uueps \label{eqn:return-mapping_1}\\
+    & \uusigmanelas = \uusigma_n + \uuuuC{} : \Delta\uueps \label{eqn:return_mapping_begin},\\
     % & \uueps_{n+1}^e = \uueps_{n}^e - \Delta\uueps - \Delta\lambda\frac{\partial f}{\partial \uusigma}(\uusigmanelas, p_n), \label{eqn:eps_e_disc} \\
     & \uusigman = \uusigmanelas - \Delta\uusigma, \\
-    & p_{n+1} = p_n + \Delta p \\%\Delta\lambda\frac{\partial f}{\partial p}(\uusigmanelas, p_n), \label{eqn:p_disc} \\
-    & \Delta\lambda \geq 0, \quad f(\uusigman, p_{n+1}) \leq 0, \quad \Delta\lambda\cdot f(\uusigman, p_{n+1}) = 0, \label{eqn:return-mapping_end}
+    & p_{n+1} = p_n + \Delta p, \\%\Delta\lambda\frac{\partial f}{\partial p}(\uusigmanelas, p_n), \label{eqn:p_disc} \\
+    & \Delta\uueps^p = \Delta\lambda\frac{\partial f}{\partial \uusigma} (\uusigman, p_{n+1}), \\
+    & \Delta p = -\Delta\lambda\frac{\partial f}{\partial p} (\uusigman, p_{n+1}), \\
+    & \Delta\lambda \geq 0, \quad f(\uusigman, p_{n+1}) \leq 0, \quad \Delta\lambda\cdot f(\uusigman, p_{n+1}) = 0, \label{eqn:return_mapping_end}
 \end{align}
-where the increment $\Delta\uueps$ depends on the displacement $\Delta\uu$ calculated on a current loading step, $\Delta\uusigma$ and $\Delta p$ are the stress and plastic strain corrections respectively. Increments $\Delta\uusigma, \Delta p$ and $\Delta\lambda$ can be found using the second Newton method, the local one.
-
-We write out a discrete form of the variational problem~\eqref{eqn:var_from_1}--\eqref{eqn:var_from_2}:
+where the increment $\Delta\uueps$ depends on the displacement $\Delta\uu$ calculated on a current loading step, $\uusigmanelas$ is an elastic trial stress, $\Delta\uusigma$ and $\Delta p$ are the stress and plastic strain corrections respectively, $\Delta\uueps^p$ is an increment of plastic strain. 
+% Increments $\Delta\uusigma, \Delta p$ and $\Delta\lambda$ can be found using the second Newton method, the local one.
+Then we write out a discrete form of the variational problem~\eqref{eqn:var_from_1}--\eqref{eqn:var_from_2}:
 \begin{align}
     & \text{Find } \uu_{n+1} \in V \text{ such that,} \label{eqn:var_disc_from_1} \\ 
     & R(\uu_{n+1}) = \int\limits_\Omega\uusigma(\uu_{n+1}) : \uueps(\uv) \, \md x - F_{n+1}^\text{ext}(\uv) = 0, \quad \forall \uv \in V \label{eqn:var_disc_from_2},
@@ -394,24 +398,27 @@ and its linearized version~\eqref{eqn:lin_var_from_1}--\eqref{eqn:lin_var_from_2
 \end{align}
 where $\uuuuC{}_{n+1}^{\text{tang}}$ is a the forth-rank tangent stiffness tensor on the $n+1$ loading step.
 
-To solve the problem~\eqref{eqn:lin_var_disc_from_1}--\eqref{eqn:lin_var_disc_from_2}, it is required to update $\sigma_{n+1}$ and $p_{n+1}$ at each iteration of the Newton method in other words, to carry out the projection of $\uusigmanelas$ on the yield surface $f(\uusigman, p_{n+1}) = 0$. It means that we need to solve the following system of nonlinear equations
-\begin{align}
-    & \uusigman = \uusigmanelas - \Delta\uusigma(\uusigma_n, p_n), \\\label{eqn:return-mapping_Newton_begin}
-    & p_{n+1} = p_n + \Delta p(\uusigma_n, p_n) \\
-    & f(\uusigman, p_{n+1}) = 0, \label{eqn:return-mapping_Newton_end}
-\end{align} 
-This can be done using an additional Newton method.
+Now we have all ingredients to introduce a quite common algorithm solving the elasto-plastic problems: the return-mapping procedure. It consists in finding a new stress $\uusigman = \uusigma(\uu_{n+1})$ and cumulative plastic strain $p_{n+1}$ verifying the current plasticity condition from previous stress $\uusigma_{n}$, cumulative plastic strain $p_n$ and an increment of total deformation $\Delta\uueps$. The whole procedure checks on every Newton iteration, if an elastic trial stress $\uusigmanelas$ goes beyond the boundary of the yield surface. In other words if $f(\uusigmanelas, p_{n+1}) > 0$, then the stress tensor and the cumulative plastic strain should be corrected by projecting them on the surface $f(\uusigman, p_{n+1}) = 0$. It means that we need to solve the nonlinear system~\eqref{eqn:return_mapping_begin}--\eqref{eqn:return_mapping_end}. This can be done using an additional Newton method, the internal one.
+
+% To solve the problem~\eqref{eqn:lin_var_disc_from_1}--\eqref{eqn:lin_var_disc_from_2}, it is required to update $\sigma_{n+1}$ and $p_{n+1}$ at each iteration of the Newton method in other words, to carry out the projection of $\uusigmanelas$ on the yield surface $f(\uusigman, p_{n+1}) = 0$. 
+% It means that we need to solve the following system of nonlinear equations
+% \begin{align}
+%     & \uusigman = \uusigmanelas - \Delta\uusigma(\uusigma_n, p_n), \\\label{eqn:return-mapping_Newton_begin}
+%     & p_{n+1} = p_n + \Delta p(\uusigma_n, p_n) \\
+%     & f(\uusigman, p_{n+1}) = 0, \label{eqn:return-mapping_Newton_end}
+% \end{align} 
+
 
 In total, we follow the next algorithm to solve elastoplastic constitutive equations~\eqref{eqn:eps_dec}--\eqref{eqn:bc} of the original problem
 \begin{enumerate}
     \item Divide the external loading $F_\text{ext}$ on $N$ steps 
-    \item For each loading step $n+1 \in {1 \dots N}$
+    \item For each loading step $n+1 \in {1 \dots N}$ :
     \begin{enumerate}
         \item Solve the variational problem~\eqref{eqn:var_disc_from_1}--\eqref{eqn:var_disc_from_2} using the Newton method, where for each Newton iteration:
         \begin{enumerate}
             \item Solve the linearized problem~\eqref{eqn:lin_var_disc_from_1}--\eqref{eqn:lin_var_disc_from_2} using finite element method
             \item Calculate $\uusigmanelas$ 
-            \item Carry out the return-mapping procedure using the internal Newton method and solve the system~\eqref{eqn:return-mapping_Newton_begin}--~\eqref{eqn:return-mapping_Newton_begin}, if the yield condition $f(\sigmaeqnelas, p_{n+1}) > 0$ is true
+            \item Carry out the return-mapping procedure using the internal Newton method and solve the system~\eqref{eqn:return_mapping_begin}--\eqref{eqn:return_mapping_end}, if the yield condition $f(\uusigman, p_{n+1}) > 0$ is true
             \item Update $\uusigman = \uusigmanelas - \Delta\uusigma$, $p_{n+1} = p_n + \Delta p$ and $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
         \end{enumerate}
         \item Update the total displacement vector $\uu_{n+1} = \uu_n + \Delta\uu$
@@ -436,6 +443,7 @@ This algorithm works correctly when the function f is smooth, i.e. its gradient 
 
 
 \subsubsection{Plasticity using convex optimization}
+\label{sec:theory:convex_optimization}
 
 When we talk about optimization problems (or mathematical programming, MP), we often have in mind a minimization problem such as
 \begin{equation}
@@ -444,13 +452,13 @@ When we talk about optimization problems (or mathematical programming, MP), we o
         f(\ul{x}) \leq 0,
     \end{cases}
 \end{equation}
-where $F$ is an objective function and $f$ is a contraint. If these functions are convex, we deal here with a convex optimization problem (or convex programming). 
+where $F$ is an objective function and $f$ is a constraint. If these functions are convex, we deal here with a convex optimization problem (or convex programming, CP). 
 
 The particular interest to us is a subfield of convex optimization, when constraints represents a convex cone, in other words conic optimization. For this type of problems the solution is unique and there are really efficient and fast solvers. The authors of this work do not consider it necessary to delve in detail into the specifics of solving optimization problems and their algorithms. We will refer only to articles by other authors whose solvers were used in the current research.
 
 Indeed, conic programming has been recognized as a suitable method for solving elastoplastic constitutive equations via the MP approach~\parencite{BRUNO2020724}. This stems from the fact that many of the yield criteria reported in the literature can be expressed as second-order and semidefinite cone constraints. In particular, the von Mises and Drucker-Prager criteria can be expressed as a second-order conic constraint, and the Rankine criterion as a semidefinite conic constraint. 
 
-We just need to reformulate the original return-mapping algorithm~\eqref{eqn:return-mapping_1}--\eqref{eqn:return-mapping_end} in terms of conic programming. Let us consider the following conic optimization problem
+We just need to reformulate the original return-mapping algorithm~\eqref{eqn:return_mapping_begin}--\eqref{eqn:return_mapping_end} in terms of conic programming. Let us consider the following conic optimization problem
 \begin{equation}
     \label{eqn:conic_problem}
     \begin{cases}
@@ -458,26 +466,27 @@ We just need to reformulate the original return-mapping algorithm~\eqref{eqn:ret
         f(\uusigma, p) \leq 0,
     \end{cases}
 \end{equation}
-where the function $f(\uusigma, p)$ is a yield criteria and the free energy $F$ of an elastoplastic material is expressed as follows
+where the function $f(\uusigma, p)$ is a yield criterion and the free energy $F$ of an elastoplastic material is expressed as follows
 \begin{equation}
     F(\uusigma, p) = \frac{1}{2}(\uusigmanelas - \uusigma) : \uuuuS : (\uusigmanelas - \uusigma) + \frac{1}{2}H(p_{n+1}^\text{elas} - p)^2,
 \end{equation}
 where $H$ is an isotropic hardening modulus and $\uusigmanelas = \uusigma_n + \uuuuC{}:\Delta\uueps$ and $p^\text{elas}_{n+1} = p_n$ are elastic predictors.
 
-Thus, the solution $(\uusigma^*, p^*)$ of the problem~\eqref{eqn:conic_problem} is the closest projection of $(\uusigmanelas, p_{n+1}^\text{elas})$ on the yield surface with respect to the distance induced by $\uuuuS$ and $H$, i.e. $(\uusigma_{n+1}, p_{n+1})$ 
+Thus, the solution $(\uusigma^*, p^*)$ of the problem~\eqref{eqn:conic_problem} is the closest projection of $(\uusigmanelas, p_{n+1}^\text{elas})$ on the yield surface with respect to the distance induced by $\uuuuS$ and $H$, i.e. $(\uusigma_{n+1}, p_{n+1})$.
 
-By analogy with the previous section~\ref{sec:theory:classical_plasticity}, we describe an algorithm for solving elastoplastic constitutive equations~\eqref{eqn:eps_dec}--\eqref{eqn:bc} using convex optimization.
+By analogy with the previous section~\ref{sec:theory:classical_plasticity}, we describe an algorithm for solving elastoplastic constitutive equations~\eqref{eqn:eps_dec}--\eqref{eqn:bc} using convex optimization:
 % % equations of the original problem
 \begin{enumerate}
-    \item Divide the external loading $F_\text{ext}$ on $N$ steps 
-    \item For each loading step $n+1 \in {1 \dots N}$
+    \item Divide the external loading $F_\text{ext}$ on $N$ steps
+    \item For each loading step $n+1 \in {1 \dots N}$:
     \begin{enumerate}
         \item Solve the variational problem~\eqref{eqn:var_disc_from_1}--\eqref{eqn:var_disc_from_2} using the Newton method, where for each Newton iteration:
         \begin{enumerate}
             \item Solve the linearized problem~\eqref{eqn:lin_var_disc_from_1}--\eqref{eqn:lin_var_disc_from_2} using finite element method
             \item Calculate $\uusigmanelas$ 
-            \item Carry out the return-mapping procedure by solving the conic optimization problem~\eqref{eqn:conic_problem}, if the yield condition $f(\sigmaeqnelas, p_{n+1}) > 0$ is true
-            \item Update $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
+            \item Carry out the return-mapping procedure by solving the conic optimization problem~\eqref{eqn:conic_problem}, if the yield condition $f(\uusigmanelas, p_{n+1}) > 0$ is true
+            % \item Update $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
+            \item Update $\uusigman = \uusigmanelas - \Delta\uusigma$, $p_{n+1} = p_n + \Delta p$ and $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
         \end{enumerate}
         \item Update the total displacement vector $\uu_{n+1} = \uu_n + \Delta\uu$
     \end{enumerate}
@@ -532,7 +541,8 @@ where $\sigma_\text{I} \geq \sigma_\text{II} \geq \sigma_\text{III}$ are princip
 \end{equation*}
 
 \subsubsection{Problem formulation}
-\label{sec:problem_formulation}
+\label{sec:theory:problem_formulation}
+
 In order to demonstrate our ideas on a concrete example, we chose a cylinder expansion problem in the two-dimensional case in a symmetric formulation. The image~\ref{fig:domain} shows the domain, where symmetry conditions are set on the left and bottom sides and pressure is set on the inner wall
 \begin{align}
     \Omega &: \dv \uusigma = 0 ,\label{eqn:cylinder_div}\\
@@ -582,7 +592,7 @@ The stress derivative is written with the following formula
 \begin{equation}
     \dfrac{\md\uusigman}{\md\uuDeltaeps} = \uuuuC{}_{n+1}^{\text{tang}} = \uuuuC{} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \uuN \otimes \uuN - 2\mu\beta\uuuuJ \label{eqn:C_tang_von_mises}
 \end{equation}
-where $\uuN = \frac{\uus}{\uusigmanelas}$.
+where $\uuN = \frac{\uus^\text{elas}_{n+1}}{\uusigmanelas}$.
 
 So we can explicitly write out the linearization of the variational problem~\eqref{eqn:cylinder_var_1}--\eqref{eqn:cylinder_var_2}
 \begin{align}
@@ -595,6 +605,7 @@ Explicit expressions~\eqref{eqn:dp_von_mises}--\eqref{eqn:C_tang_von_mises} are 
 Now we have at our disposal everything necessary for the successful modeling of the von Mises elasto-plasticity. In the next part, we will talk in detail about ways to solve this problem using various approaches via the FEniCSx and cvxpy libraries.
 
 \subsection{Development}
+\label{sec:development}
 
 The development of a program for modeling the cylinder expansion problem was carried out with the support of the finite element library FEniCSx. As mentioned earlier, the initial problem has different formulations, for each of which a separate program is written. The open source code is available on the Github repository~\cite{convex-plasticity}. 
 
@@ -702,6 +713,7 @@ We would like to note here that the exact calculation of the derivative signific
 where $E^*$, $\sigma_0^*$, $R_i^*$ and $R_e^*$ are dimensionless Young modulus, uniaxial strength, internal and external radii of the cylinder respectively.
 
 \subsubsection{Classical approach}
+\label{sec:development:classical_approach}
 
 In this section, we will describe main components of elastic-plastic modeling for solving the~\eqref{eqn:cylinder_var_1}--\eqref{eqn:cylinder_var_2} problem using FEniCSx. Only important parts of the program code will be given here. The full software implementation is made publicly available by~\parencite{convex-plasticity}. We recall that this implementation is based on the one of~\textcite{bleyer2018numericaltours}, where the von Mises plasticity analysis used the previous version of FEniCS 2019. The current version of FEniCSx 0.3.1.0 currently contains more features that allow us to improve the previous implementation. We call this approach \textit{classical} to pay tribute to the original implementation: the approach described here uses the same idea of determining the stress field $\uusigman$, the internal variable $p_{n+1}$ and other auxiliary variables in quadrature functional spaces. In this sense, the classical approach does not bring anything new, but optimizes the source code using the interpolation feature integrated into the \mypython{eval} method of \mypython{fem.Expression} entity.
 
@@ -728,7 +740,7 @@ To initialize target variables and function spaces, it is enough to write the fo
 
 It can be seen from this code that we store the values of $\uusigman$ in a vector \mypython{sig} ($\bsigma_{n+1}$ in Voigt notation). In the future, we will work with $\uusigman$ in both tensor and Voigt notations, depending on convenience.
 
-In this approach, we use our own custom Newton method. It means that we need to define a linearized variational problem~\eqref{eqn:cylinder_lin_var_from_1}--~\eqref{eqn:cylinder_lin_var_from_2} using FEniCSx tools. So we have to represent $\uuuuC{}_{n+1}^\text{tang}$ as \mypython{fem.Expression} using UFL. Although FEniCSx allows us to work with rank 4 tensors, in this case it is more convenient to work with the expression $\uuuuC{}_{n+1}^\text{tang} : \uueps(\Delta\uu)$ and not to store the values of the entire tensor $\uuuuC{}_{n+1}^\text{tang}$ globally, so we use the function \mypython{sigma_tang} 
+In this approach, we use our own custom Newton method. It means that we need to define a linearized variational problem~\eqref{eqn:cylinder_lin_var_from_1}--\eqref{eqn:cylinder_lin_var_from_2} using FEniCSx tools. So we have to represent $\uuuuC{}_{n+1}^\text{tang}$ as \mypython{fem.Expression} using UFL. Although FEniCSx allows us to work with rank 4 tensors, in this case it is more convenient to work with the expression $\uuuuC{}_{n+1}^\text{tang} : \uueps(\Delta\uu)$ and not to store the values of the entire tensor $\uuuuC{}_{n+1}^\text{tang}$ globally, so we use the function \mypython{sigma_tang} 
 \begin{pythoncode}
     def sigma_tang(e):
     N_elas = as_3D_tensor(n_elas)
@@ -805,6 +817,8 @@ where \mypython{pf.SNESProblem} is a support class to work with the SNES solver.
 We note here that, as in the classical approach, this method is possible only in special cases when it is possible to calculate analytically $\Delta\uueps^p$.
 
 \subsubsection{Convex plasticity}
+\label{sec:development:convex_plasticity}
+
 We call the \textit{convex plasticity} or the convex optimization approach the one where the return-mapping algorithm is implemented by solving the optimization problem. It is solved at some point in the domain where we know the values of the stress components and cumulative plastic strain. We noted above that the stresses are calculated in Gaussian nodes, so the problem must be solved in each individual node. This approach is not numerically efficient. It is more convenient to solve it simultaneously for several Gaussian nodes. In this case, the order is not important. Therefore, we need to reformulate the problem~\eqref{eqn:conic_problem_Voigt} in vector form. 
 
 For this purpose, we will assemble several Gauss nodes into groups or patches. If there are $N_q$ Gauss nodes in total in a functional space of quadratures, then there will be $1 \leq N_\text{patch} \leq N_q$ points in one patch. Using this notation, we will rewrite the conic optimization problem in vector~\eqref{eqn:conic_problem_Voigt} form:
@@ -832,6 +846,7 @@ Note that the free energy $F$ doesn't depend on the plasticity criterion. In ord
 Note that the optimization problem is solved $\left\lfloor N_q / N_\text{patch}\right\rfloor$ times, if this division contains a nonzero remainder, then the conic problem~\eqref{eqn:conic_problem_vectorized} is solved additionally for the remaining $N_q \bmod N_\text{patch}$ Gauss nodes. 
 
 \subsection{Performance}
+\label{sec:performance}
 
 The second part of this paper discusses strategies to improve the performance of the described above approaches solving plasticity problems. Before describing these ones in detail, we will first talk about the obstacles, that we encountered during the development of the methods presented in the first part of this research. 
 
@@ -1065,6 +1080,7 @@ Finally we developed our own custom assembler which makes use of two new entitie
 \newpage
 \section{Results}
 % \section{Résultats}
+\label{sec:results}
 
 \subsection{Qualitative yield criterions comparison}
 
@@ -1137,6 +1153,7 @@ Summarizing the numerical tests described above, we can conclude the following:
 \end{itemize}
 
 \subsection{Custom assembling performance}
+\label{sec:custom_asssembling_performance}
 
 In this section, we analyze the effectiveness of the implementation of the custom assembly approach regarding the classical one and depending on the mesh density. A series of numerical tests was performed based on the original cylinder expansion problem using the von Mises criterion. Each test corresponds to a finite element mesh, data of which are presented in the table~\ref{tab:custom_assembling_tests}. 
 
@@ -1170,17 +1187,26 @@ The results of the numerical experiment show that the compilation time of JIT ov
 
 From this we can conclude that for complex nonlinear problems, as well as those where the use of a mesh with a large number of elements is required, the compilation time is negligible compared with the total running time of the program. At the same time, this approach is only slightly inferior in time to the classical one.
 
-\subsection{Newton}
+\subsection{Newton and quasi-Newton methods performance}
+
+Solving the problem in the formulation~\eqref{eqn:cylinder_SNES_var_1}--\eqref{eqn:cylinder_SNES_var_2}, we can compare the performance of Newton (SNES) and quasi-Newton (SNESQN) methods. In this section, the results of numerical experiments are presented, where the number of iterations required for convergence of both methods, depending on mesh density, as well as the total running time of the programs were recorded. This number corresponds to the last loading step when plastic deformations are maximal. The data of finite element meshes are identical to those taken from the section~\ref{sec:custom_asssembling_performance} and presented in the table~\ref{tab:custom_assembling_tests}.
+
+The image~\ref{fig:SNES_vs_SNESQN} shows plots of the dependence of the iterations number required for convergence of two methods on a test number. In addition, plots of the total running time for each method are showed, depending on the mesh. 
 
 \begin{figure}[H]
     \center
     \includegraphics[width=1\linewidth]{img/SNES_vs_SNESQN.png}
-    \caption{T}
-    % \label{fig:custom_assembling_analysis}
+    \caption{Performance comparison of the standard Newton method (SNES) and the quasi-Newton one (SNESQN)}
+    \label{fig:SNES_vs_SNESQN}
 \end{figure}
+
+We observe interesting results. On the one hand, as expected, the quasi-Newton method requires more iterations for convergence. At the same time, this number decreases with increasing mesh density. This can be explained by the fact that the denser the mesh, the more accurate the values of such quantities as stresses we get. As consequence the stress derivative is calculated more accurately, on which the convergence of the method depends. At the same time, as expected, the convergence of the standard Newton method does not depend on the mesh density and it requires a much smaller number of iterations for convergence. 
+
+On the other hand, we note that a program based on the quasi-Newton method works faster than its SNES counterpart, despite the fact that SNESQN spends more iterations for convergence. We remind that in the formulation used here, the \mypython{ufl.derivative} function is used to take the derivative by means of UFL. Therefore as the number of mesh elements increases, the \mypython{ufl.derivative} function, which is used by SNES, works slower than the derivative approximation by means of SNESQN.
 
 \newpage
 \section{Discussion}
+\label{sec:discussion}
 
 We wrote the first working version of the program in Python, solving plasticity problems using convex optimization for the FEniCSx Project. The results of the work demonstrate that this approach is applicable for different models of plasticity. Moreover, we used modern python libraries to write just-in-time compilation code, which simplifies the development process while maintaining a level of performance comparable to the source code written in C$\backslash$C++. Thus, we show that it is possible to solve plasticity problems efficiently, quickly and for different yield criteria, even for non-smooth ones, using modern open-source libraries. 
 
@@ -1196,6 +1222,8 @@ Ultimately, this work is distributed in the public domain. This allows other res
 \phantomsection
 \addcontentsline{toc}{section}{Conclusion}
 \section*{Conclusion}
+\label{sec:conclusion}
+
 As a result of the work done, the framework was developed in python, using the libraries FEniCSx, cvxpy, numba and others. It allows you to model the behavior of solids taking into account elastic-plastic effects on the example of the cylinder expansion problem. In this framework, both a common approach to modeling plasticity through the return-mapping algorithm and using conic optimization can be found. The latter works on a wide range of yield criteria, when the classical approach is adapted to the criteria of von Mises and Drucker-Prager. In addition to the last two, the Rankine criterion is also taken into account in the work. The work was performed for a special case of plane strain, but its results can be generalized to three-dimensional plasticity problems taking into account full-isotropic hardening law, as well as other plasticity criteria.
 
 The simulation results were carried out for different conic solvers, and the effect of the size of the vectorized conic optimization problem was analyzed. The topic of solving plasticity using conic solvers is not limited to these results. The work can be supplemented with additional research.
@@ -1219,110 +1247,117 @@ The framework code is publicly available: \parencite{convex-plasticity}.
 \begin{appendices}
     \section{Drucker-Prager material}
     \label{appendix:DP}
-    In this part, we will analytically derive expressions such as $\uusigman, \Delta p, \Delta\uusigma, \uuuuC{}^\text{tang}_{n+1}$ for the Drucker-Prager criterion, which simplify a numerical solution of plasticity problems. The conclusion is similar to the corresponding formulas from the section\ref{sec:problem_formulation} for the von Mises criterion, repeating the reasoning from~\cite{bonnet:hal-01083772}.
+    In this part, we analytically derive such expressions as $\uusigman, \Delta p, \Delta\uusigma, \uuuuC{}^\text{tang}_{n+1}$, etc for the Drucker-Prager criterion, which simplify a numerical solution of plasticity problems. The conclusion is similar to the corresponding formulas from the section~\ref{sec:problem_formulation} for the von Mises criterion, repeating the reasoning from~\parencite{bonnet:hal-01083772}.
 
     We duplicate the Drucker-Prager yield criterion below 
     \begin{equation}
-        f(\uusigma, p) = \sigma_{\text{eq}} + \alpha \mtr \uusigma - R(p) \leq 0.
+        f(\uusigma, p) = \sigma_{\text{eq}} + \alpha \mtr \uusigma - R(p) \leq 0,
     \end{equation}
-    We recall the dependence of stresses on deformations, simultaneously introducing a designation for elastic trail stress.
-    \begin{equation}
-        \uusigma = \uuuuC{} : \uueps^e = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p 
-    \end{equation}
+    where the expression $R(p) = \sigma_0 + h p $ represents a linear isotropic hardening.
+
+    We recall the dependence of stresses on deformations, simultaneously introducing an elastic trail stress $\uusigma_\text{elas}$.
+    \begin{align}
+        & \uusigma = \uuuuC{} : \uueps^e = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p, \label{eqn:constitutive_plastic_law}, \\
+        & \uusigma_\text{elas} = \uuuuC{} : \uueps = (3k\uuuuJ + 2\mu\uuuuK) : \uueps. \label{eqn:sigma_elas}
+    \end{align}
     For further implications, it will be convenient to work in terms of deviatory parts of deformations and stresses respectively:
     \begin{align*}
-        & \uue = \uueps - \frac{1}{3}\mtr\uueps \, \uuUnit \\
-        & \uus = \uusigma - \frac{1}{3}\mtr\uusigma \, \uuUnit 
+        & \uue = \uueps - \frac{1}{3}\mtr\uueps \, \uuUnit, \\
+        & \uus = \uusigma - \frac{1}{3}\mtr\uusigma \, \uuUnit.
     \end{align*}
-    
     In this particular case the associative plasticity law looks as following
-    \begin{equation}
+    \begin{equation}\label{eqn:plasticity_law}
         \dot{\uueps}^p = \dot{\lambda} \frac{\partial f}{\partial \uusigma} = \dot{\lambda} \left(\frac{3}{2} \frac{\uus}{\sigma_\text{eq}} + \alpha \uuUnit \right).
     \end{equation}
     From this we can conclude that 
-    \begin{equation}
-        \dot{p} = \sqrt{\frac{2}{3} \dot{\uue}^p : \dot{\uue}^p} = \dot{\lambda} 
+    \begin{equation}\label{eqn:p_lambda}
+        \dot{p} = \sqrt{\frac{2}{3} \dot{\uue}^p : \dot{\uue}^p} = \dot{\lambda}, 
     \end{equation}
-    Now let's rewrite the associative plasticity law in its discrete form using the expression REF 
+
+    At each $n+1$ loading step, we look for the true values of the stress tensor, cumulative plastic strain and other quantities. At the same time, we know its values from the previous step $n$, this allows us to represent each quantity as the sum of the value from the last step and some increment. Everywhere below, we adhere to the following notation
+    \begin{align*}
+        & \uusigman = \uusigma_n + \Delta\uusigma, \\
+        & \uus_{n+1} = \uus_n + \Delta\uus, \\
+        & \uueps^p_{n+1} = \uueps^p_{n} + \Delta\uueps^p, \\
+        & \uue^p_{n+1} = \uue^p_{n} + \Delta\uue^p, \\
+        & p_{n+1} = p_n + \Delta p.
+    \end{align*}
+
+    Now let's rewrite the associative plasticity law~\eqref{eqn:plasticity_law} in its discrete form using the expression~\eqref{eqn:p_lambda} 
     \begin{align}
-        & \Deltaepsp = \Delta p_n \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right) \\
-        & \Deltaep = \Delta p_n \frac{3}{2} \frac{\uusn}{\sigmaeqn} 
+        & \Delta\uueps^p= \Delta p \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right) \label{eqn:epsp_disc}\\
+        & \Delta\uue^p = \Delta p \frac{3}{2} \frac{\uusn}{\sigmaeqn} \label{eqn:ep_disc}
     \end{align}
-    Differentiating the expression by time and applying the Euler scheme we get
+    Differentiating the expression~\eqref{eqn:constitutive_plastic_law} by time, substituting the equalities~\eqref{eqn:epsp_disc}--\eqref{eqn:ep_disc} and applying the backward Euler scheme we get 
+    % the following sequence of equalities
     \begin{align}
-        & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaep - k \mtr (\Deltaepsp) \uuUnit \\
-        & \uus_{n+1} = \uus_{n+1}^\text{elas} - 2\mu\Deltaep \\
-        & \uus_{n+1}^\text{elas} = \uus_{n+1} + 3\mu\Delta p_n \frac{\uusn}{\sigmaeqn} = \uus_{n+1} (1 +  3\mu\Delta p_n \frac{1}{\sigmaeqn}) \\
-        & \sigmaeqnelas = \sigmaeqn (1 +  3\mu\Delta p_n \frac{1}{\sigmaeqn}) \\
-        & \frac{\uusnelas}{\sigmaeqnelas} = \frac{\uusn}{\sigmaeqn}
+        & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Delta\uue^p - k \mtr (\Delta\uueps^p) \uuUnit, \label{eqn:sigma_disc}\\
+        & \uus_{n+1} = \uus_{n+1}^\text{elas} - 2\mu\Delta\uue^p, \\
+        & \uus_{n+1}^\text{elas} = \uus_{n+1} + 3\mu\Delta p \frac{\uusn}{\sigmaeqn} = \uus_{n+1} (1 +  3\mu\Delta p \frac{1}{\sigmaeqn}), \\
+        & \sigmaeqnelas = \sigmaeqn (1 +  3\mu\Delta p \frac{1}{\sigmaeqn}),
     \end{align}
-    
     from which it follows that
+    \begin{equation}
+        \frac{\uusnelas}{\sigmaeqnelas} = \frac{\uusn}{\sigmaeqn}
+    \end{equation}
     and 
+    \begin{equation}\label{eqn:sigmaeqn_disc}
+        \sigmaeqn = \sigmaeqnelas - 3\mu\Delta p.
+    \end{equation} 
+    Let's write down useful expressions   
+    \begin{align}
+        & \mtr \uusigman = \mtr \uusigmanelas - 3\kappa \mtr \Delta\uueps^p, \label{eqn:tr_sigman}\\
+        & \mtr \Delta\uueps^p= 3\alpha \Delta p. \label{eqn:tr_delta_eps_p}
+    \end{align}
 
-    \begin{equation}
-        \sigmaeqn = \sigmaeqnelas - 3\mu\Delta p_n 
+    Since we are implementing a return-mapping procedure for the $n + 1$ loading step, we are looking for $\uusigman$ and $p_{n+1}$ which are situated on the Drucker-Prager yield surface, i.e. they satisfy the equality 
+    \begin{equation}\label{eqn:DP_yield_criterion_disc}
+        \sigmaeqn + \alpha \mtr \uusigman - R(p_{n+1}) = 0,
     \end{equation}
-
-    % \begin{align}
-    %     & \uusigma = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p
-    % \end{align}
-
-    
-    Let's write down useful expressions
-    
-    \begin{align}
-        & \mtr \uusigman = \mtr \uusigmanelas - 3\kappa \mtr \Deltaepsp \\
-        & \mtr \Deltaepsp = 3\alpha \Delta p_n
-    \end{align}
-    Since we are implementing a return-mapping procedure for n+1 load steps, we are looking for SIGMA P that are on the Drucker-Prager flow surface, i.e. I satisfy the equality 
-    
-    \begin{equation}
-        \sigmaeqn + \alpha \mtr \uusigman - R(p_n + \Delta p_n) = 0,
+    substituting expressions~\eqref{eqn:sigmaeqn_disc}--\eqref{eqn:tr_delta_eps_p} into equality~\eqref{eqn:DP_yield_criterion_disc}, we get an expression for the cumulative plastic strain increment $\Delta p$
+    \begin{equation}\label{eqn:delta_p}
+        % & \sigmaeqnelas - 3\mu\Delta p + \alpha \mtr \uusigmanelas - 3\kappa 3\alpha^2 \Delta p - \sigma_0 - h p_n - h \Delta p = 0 \\
+        \Delta p = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \gamma },
     \end{equation}
-    where the expression $R(p) = \sigma_0 + h p $ represents linear isotropic hardening.
-
-    substituting expressions into equality, we get an expression for the plastic strain increment
-    \begin{align}
-        & \sigmaeqnelas - 3\mu\Delta p_n + \alpha \mtr \uusigmanelas - 3\kappa 3\alpha^2 \Delta p_n - \sigma_0 - h p_n - h \Delta p_n = 0 \\
-        & \Delta p_n = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ 3\mu + 9\alpha^2\kappa + h} = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \gamma } \\
-        & \gamma = 3\mu + 9\alpha^2\kappa + h
-    \end{align}
+    where $\gamma = 3\mu + 9\alpha^2\kappa + h$.
     
-    As has been repeatedly pointed out in the text, an important element of the numerical solution of plasticity problems is the stress-strain derivative. In the case of the Drucker Prager criterion, we can calculate it analytically. This means that we need to find an explicit expression for 
+    Combining the equations~\eqref{eqn:epsp_disc}--\eqref{eqn:sigma_disc} and~\eqref{eqn:delta_p} together we can derive the final expression of $\uusigma_{n+1}$:
+    \begin{equation}
+        % & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Delta\uue^p - \kappa \mtr (\Delta\uueps^p) \uuUnit \\
+        \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - \left( \beta \uusnelas + 3k\alpha \Delta p \uuUnit \right),
+    \end{equation}
+    where $\beta = 3\mu\frac{\Delta p}{\sigmaeqnelas}$.
+
+    As has been repeatedly pointed out in the text, an important element of the numerical solution of plasticity problems is the stress-strain derivative. In the case of the Drucker-Prager criterion, we can calculate it analytically. This means that we need to find an explicit expression for 
+    \begin{equation*}
+        \uuuuC{}^\text{tang}_{n+1} = \frac{\partial\uusigman}{\partial \Delta\uueps} = \uuuuC{} - \frac{\partial (2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit)}{\partial\Delta\uueps} = \uuuuC{} - \uuuuD,
+    \end{equation*}
+    where $\uuuuC{}^\text{tang}_{n+1}$, $\uuuuC{}$ and $\uuuuD$ are the forth order tensors and $\uuuuD$ represents a plastic correction of the derivative.
     
-    where the 4 - order tensor D is written
-    
-    To do this, we will need expressions, we will write them explicitly using the equalities
-
-
-
+    First of all, let's write explicitly following derivatives using the equalities~\eqref{eqn:sigma_elas},~\eqref{eqn:sigmaeqn_disc}--\eqref{eqn:tr_sigman},~\eqref{eqn:delta_p} :
     \begin{align}
-        & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaep - \kappa \mtr (\Deltaepsp) \uuUnit \\
-        & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - \left( \beta \uusnelas + 3k\alpha \Delta p_n \uuUnit \right) \\
-        & \beta = 3\mu\frac{\Delta p_n}{\sigmaeqnelas} 
+        & \frac{\partial \uusnelas{}}{\partial \Delta\uueps} = 2\mu \uuuuK, \\
+        & \frac{\partial \sigmaeqnelas{}}{\partial \Delta\uueps} = \frac{3\mu}{\sigmaeqnelas}\uusnelas, \\
+        & \frac{\partial\mtr\sigmaeqn}{\partial\Delta\uueps} = 3k\uuUnit, \\
+        % & \frac{\partial (\mtr (\Delta\uueps^p) )}{\partial \Delta\uueps} = \uuUnit \\
+        % & \frac{\partial \Delta\uueps^p}{\partial \Delta\uueps} = \frac{\partial}{\partial \Delta\uueps} \left( \frac{\Delta p}{\sqrt{1 + 2\alpha^2}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right) \\
+        % & 2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit = \Delta p\left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \\
+        & \frac{\partial\Delta p}{\partial\Delta\uueps} = \frac{1}{\gamma} \frac{\partial(\sigmaeqnelas + \alpha \mtr \uusigmanelas)}{\partial\Delta\uueps} = \frac{1}{\gamma} \left( \frac{3\mu}{\sigmaeqnelas}\uusnelas + 3k\alpha\uuUnit \right) = \frac{1}{\gamma}(3\mu \uuN + 3k\uuUnit),
     \end{align}
+    where $\uuN = \frac{\uus^\text{elas}_{n+1}}{\sigmaeqnelas} = \frac{\uus_{n+1}}{\sigmaeqn}$.
+    Then we use these expressions to get $\uuuuD$:
+    \begin{align*}
+        % & \frac{\partial\uusigman}{\partial \Delta\uueps} = \uuuuC{} - \frac{\partial (2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit)}{\partial\Delta\uueps} = \uuuuC{} - \uuuuD \\
+        & \uuuuD = \frac{\partial (2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit)}{\partial\Delta\uueps} = \frac{\partial }{\partial \Delta\uueps} \left( \Delta p \left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \right) = \\
+        & = \left( \frac{\partial\Delta p}{\partial\Delta\uueps} \otimes \left( 3\mu\frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit \right) + \Delta p \left(3\mu\frac{\partial\uusnelas}{\partial\Delta\uueps}\frac{1}{\sigmaeqnelas} \right) - \Delta p 3\mu\frac{\uusnelas}{(\sigmaeqnelas)^2} \otimes \frac{\partial\sigmaeqnelas}{\partial\Delta\uueps}\right) = \\
+        & = \left( \left( 3\mu \uuN + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( 3\mu \uuN + 3\alpha k \uuUnit \right) + 2\mu\beta\uuuuK - 3\mu\beta\uuN \otimes \uuN \right), \\
+        & \uuuuD = \left( 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uuN \otimes \uuN + \frac{9\alpha\mu k}{\gamma} (\uuUnit \otimes \uuN + \uuN \otimes \uuUnit) + \frac{9\alpha^2k^2}{\gamma} \uuUnit \otimes \uuUnit + 2\mu\beta \uuuuK \right)
+        % & \uuuuD : \Delta\uueps = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \uuN : \Delta\uueps \left( \frac{9\alpha\mu k}{\gamma}\uuUnit + 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uuN \right) + \mtr \Delta\uueps \left( \frac{9\alpha\mu k}{\gamma}  \uuN + \frac{9\alpha^2k^2}{\gamma} \uuUnit \right) + 2\mu\beta \Delta\uue^p \right) \\
+        % & \uuuuD : \Delta\uueps = \\
+        % & = \left( \uuN : \Delta\uueps 3\mu \left( \frac{3\mu}{\gamma} - \beta \right) \uuN + \frac{9\alpha\mu k}{\gamma} (\uuN : \Delta\uueps \uuUnit + \mtr\Delta\uueps \uuN) + \frac{9\alpha^2k^2}{\gamma} \mtr \Delta\uueps \uuUnit + 2\mu\beta \Delta\uue^p \right)  \\
+    \end{align*}
 
-    \begin{align}
-        & \frac{\partial \uusnelas{}}{\partial \Deltaeps} = 2\mu \uuuuK\\
-        & \frac{\partial \sigmaeqnelas{}}{\partial \Deltaeps} = \frac{3\mu}{\sigmaeqnelas}\uusnelas \\
-        & \frac{\partial\mtr\sigmaeqnelas}{\partial\Deltaeps} = 3k\uuUnit \\
-        % & \frac{\partial (\mtr (\Deltaepsp) )}{\partial \Deltaeps} = \uuUnit \\
-        % & \frac{\partial \Deltaepsp}{\partial \Deltaeps} = \frac{\partial}{\partial \Deltaeps} \left( \frac{\Delta p_n}{\sqrt{1 + 2\alpha^2}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right) \\
-        & 2\mu\Deltaep + k\mtr\Deltaepsp\uuUnit = \Delta p_n\left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \\
-        & \frac{\partial\Delta p_n}{\partial\Deltaeps} = \frac{1}{\gamma} \frac{\partial(\sigmaeqnelas + \alpha \mtr \uusigmanelas)}{\partial\Deltaeps} = \frac{1}{\gamma} \left( \frac{3\mu}{\sigmaeqnelas}\uusnelas + 3k\alpha\uuUnit \right) = \frac{1}{\gamma}(3\mu \uuN + 3k\uuUnit)
-    \end{align}
-
-    \begin{align}
-        & \frac{\partial\uusigman}{\partial \Deltaeps} = \uuuuC{} - \frac{\partial (2\mu\Deltaep + k\mtr\Deltaepsp\uuUnit)}{\partial\Deltaeps} = \uuuuC{} - \uuuuD \\
-        & \uuuuD =  \frac{\partial }{\partial \Deltaeps} \left( \Delta p_n \left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \right) = \\
-        & = \left( \frac{\partial\Delta p_n}{\partial\Deltaeps} \otimes \left( 3\mu\frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit \right) + \Delta p_n \left(3\mu\frac{\partial\uusnelas}{\partial\Deltaeps}\frac{1}{\sigmaeqnelas} \right) - \Delta p_n 3\mu\frac{\uusnelas}{(\sigmaeqnelas)^2} \otimes \frac{\partial\sigmaeqnelas}{\partial\Deltaeps}\right) = \\
-        & = \left( \left( 3\mu \uuN + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( 3\mu \uuN + 3\alpha k \uuUnit \right) + 2\mu\beta\uuuuK - 3\mu\beta\uuN \otimes \uuN \right) \\
-        & \uuuuD = \left( 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uuN \otimes \uuN + \frac{9\alpha\mu k}{\gamma} (\uuUnit \otimes \uuN + \uuN \otimes \uuUnit) + \frac{9\alpha^2k^2}{\gamma} \uuUnit \otimes \uuUnit + 2\mu\beta \uuuuK \right) \\
-        % & \uuuuD : \Deltaeps = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \uuN : \Deltaeps \left( \frac{9\alpha\mu k}{\gamma}\uuUnit + 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uuN \right) + \mtr \Deltaeps \left( \frac{9\alpha\mu k}{\gamma}  \uuN + \frac{9\alpha^2k^2}{\gamma} \uuUnit \right) + 2\mu\beta \Deltaep \right) \\
-        & \uuuuD : \Deltaeps = \\
-        & = \left( \uuN : \Deltaeps 3\mu \left( \frac{3\mu}{\gamma} - \beta \right) \uuN + \frac{9\alpha\mu k}{\gamma} (\uuN : \Deltaeps \uuUnit + \mtr\Deltaeps \uuN) + \frac{9\alpha^2k^2}{\gamma} \mtr \Deltaeps \uuUnit + 2\mu\beta \Deltaep \right)  \\
-    \end{align}
+    Thus, we have derived the analytical formulas necessary for the return-mapping procedure in the case of the Drucker-Prager yield criterion. Substituting zero instead of the alpha parameter in the formulas above, we get exactly the analytical expressions for the von Mises criterion presented in the section~\ref{sec:problem_formulation}.
 \end{appendices}
 
 
