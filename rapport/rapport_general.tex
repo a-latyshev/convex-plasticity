@@ -532,7 +532,7 @@ where $\sigma_\text{I} \geq \sigma_\text{II} \geq \sigma_\text{III}$ are princip
 \end{equation*}
 
 \subsubsection{Problem formulation}
-
+\label{sec:problem_formulation}
 In order to demonstrate our ideas on a concrete example, we chose a cylinder expansion problem in the two-dimensional case in a symmetric formulation. The image~\ref{fig:domain} shows the domain, where symmetry conditions are set on the left and bottom sides and pressure is set on the inner wall
 \begin{align}
     \Omega &: \dv \uusigma = 0 ,\label{eqn:cylinder_div}\\
@@ -1170,6 +1170,15 @@ The results of the numerical experiment show that the compilation time of JIT ov
 
 From this we can conclude that for complex nonlinear problems, as well as those where the use of a mesh with a large number of elements is required, the compilation time is negligible compared with the total running time of the program. At the same time, this approach is only slightly inferior in time to the classical one.
 
+\subsection{Newton}
+
+\begin{figure}[H]
+    \center
+    \includegraphics[width=1\linewidth]{img/SNES_vs_SNESQN.png}
+    \caption{T}
+    % \label{fig:custom_assembling_analysis}
+\end{figure}
+
 \newpage
 \section{Discussion}
 
@@ -1210,31 +1219,36 @@ The framework code is publicly available: \parencite{convex-plasticity}.
 \begin{appendices}
     \section{Drucker-Prager material}
     \label{appendix:DP}
+    In this part, we will analytically derive expressions such as $\uusigman, \Delta p, \Delta\uusigma, \uuuuC{}^\text{tang}_{n+1}$ for the Drucker-Prager criterion, which simplify a numerical solution of plasticity problems. The conclusion is similar to the corresponding formulas from the section\ref{sec:problem_formulation} for the von Mises criterion, repeating the reasoning from~\cite{bonnet:hal-01083772}.
 
+    We duplicate the Drucker-Prager yield criterion below 
     \begin{equation}
-        f(\uusigma, p) = \sigma_{\text{eq}} + \alpha \mtr \uusigma - R(p) \leq 0
+        f(\uusigma, p) = \sigma_{\text{eq}} + \alpha \mtr \uusigma - R(p) \leq 0.
     \end{equation}
-
-    \begin{align}
-        & \uusigma = \uuuuC{} : \uueps^e = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p \\
+    We recall the dependence of stresses on deformations, simultaneously introducing a designation for elastic trail stress.
+    \begin{equation}
+        \uusigma = \uuuuC{} : \uueps^e = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p 
+    \end{equation}
+    For further implications, it will be convenient to work in terms of deviatory parts of deformations and stresses respectively:
+    \begin{align*}
         & \uue = \uueps - \frac{1}{3}\mtr\uueps \, \uuUnit \\
         & \uus = \uusigma - \frac{1}{3}\mtr\uusigma \, \uuUnit 
-    \end{align}
-
+    \end{align*}
+    
+    In this particular case the associative plasticity law looks as following
     \begin{equation}
-        \dot{\uueps}^p = \dot{\lambda} \frac{\partial f}{\partial \uusigma} = \dot{\lambda} \left(\frac{3}{2} \frac{\uus}{\sigma_\text{eq}} + \alpha \uuUnit \right)
+        \dot{\uueps}^p = \dot{\lambda} \frac{\partial f}{\partial \uusigma} = \dot{\lambda} \left(\frac{3}{2} \frac{\uus}{\sigma_\text{eq}} + \alpha \uuUnit \right).
     \end{equation}
-
+    From this we can conclude that 
+    \begin{equation}
+        \dot{p} = \sqrt{\frac{2}{3} \dot{\uue}^p : \dot{\uue}^p} = \dot{\lambda} 
+    \end{equation}
+    Now let's rewrite the associative plasticity law in its discrete form using the expression REF 
     \begin{align}
-        & \dot{p} = \sqrt{\frac{2}{3} \dot{\uue}^p : \dot{\uue}^p} = \dot{\lambda} \\
         & \Deltaepsp = \Delta p_n \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right) \\
         & \Deltaep = \Delta p_n \frac{3}{2} \frac{\uusn}{\sigmaeqn} 
     \end{align}
-
-    \begin{align}
-        & \uusigma = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p
-    \end{align}
-
+    Differentiating the expression by time and applying the Euler scheme we get
     \begin{align}
         & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaep - k \mtr (\Deltaepsp) \uuUnit \\
         & \uus_{n+1} = \uus_{n+1}^\text{elas} - 2\mu\Deltaep \\
@@ -1242,20 +1256,46 @@ The framework code is publicly available: \parencite{convex-plasticity}.
         & \sigmaeqnelas = \sigmaeqn (1 +  3\mu\Delta p_n \frac{1}{\sigmaeqn}) \\
         & \frac{\uusnelas}{\sigmaeqnelas} = \frac{\uusn}{\sigmaeqn}
     \end{align}
+    
+    from which it follows that
+    and 
 
+    \begin{equation}
+        \sigmaeqn = \sigmaeqnelas - 3\mu\Delta p_n 
+    \end{equation}
+
+    % \begin{align}
+    %     & \uusigma = (3k\uuuuJ + 2\mu\uuuuK) : (\uueps - \uueps^p) = \uusigma_\text{elas} - (3k\uuuuJ + 2\mu\uuuuK) : \uueps^p
+    % \end{align}
+
+    
+    Let's write down useful expressions
+    
     \begin{align}
-        & \sigmaeqn = \sigmaeqnelas - 3\mu\Delta p_n \\
         & \mtr \uusigman = \mtr \uusigmanelas - 3\kappa \mtr \Deltaepsp \\
         & \mtr \Deltaepsp = 3\alpha \Delta p_n
     \end{align}
+    Since we are implementing a return-mapping procedure for n+1 load steps, we are looking for SIGMA P that are on the Drucker-Prager flow surface, i.e. I satisfy the equality 
+    
+    \begin{equation}
+        \sigmaeqn + \alpha \mtr \uusigman - R(p_n + \Delta p_n) = 0,
+    \end{equation}
+    where the expression $R(p) = \sigma_0 + h p $ represents linear isotropic hardening.
 
+    substituting expressions into equality, we get an expression for the plastic strain increment
     \begin{align}
-        & \sigmaeqn + \alpha \mtr \uusigman - R(p_n + \Delta p_n) = 0 \\
-        & R(p) = \sigma_0 + h p \\
         & \sigmaeqnelas - 3\mu\Delta p_n + \alpha \mtr \uusigmanelas - 3\kappa 3\alpha^2 \Delta p_n - \sigma_0 - h p_n - h \Delta p_n = 0 \\
         & \Delta p_n = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ 3\mu + 9\alpha^2\kappa + h} = \frac{ \sigmaeqnelas + \alpha \mtr \uusigmanelas - \sigma_0 - h p_n}{ \gamma } \\
         & \gamma = 3\mu + 9\alpha^2\kappa + h
     \end{align}
+    
+    As has been repeatedly pointed out in the text, an important element of the numerical solution of plasticity problems is the stress-strain derivative. In the case of the Drucker Prager criterion, we can calculate it analytically. This means that we need to find an explicit expression for 
+    
+    where the 4 - order tensor D is written
+    
+    To do this, we will need expressions, we will write them explicitly using the equalities
+
+
 
     \begin{align}
         & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Deltaep - \kappa \mtr (\Deltaepsp) \uuUnit \\
@@ -1283,32 +1323,6 @@ The framework code is publicly available: \parencite{convex-plasticity}.
         & \uuuuD : \Deltaeps = \\
         & = \left( \uuN : \Deltaeps 3\mu \left( \frac{3\mu}{\gamma} - \beta \right) \uuN + \frac{9\alpha\mu k}{\gamma} (\uuN : \Deltaeps \uuUnit + \mtr\Deltaeps \uuN) + \frac{9\alpha^2k^2}{\gamma} \mtr \Deltaeps \uuUnit + 2\mu\beta \Deltaep \right)  \\
     \end{align}
-
-    \begin{align}
-        & F = \int\limits_\Omega \uusigman : \uueps(\uv) \, \md\Omega - \uF_\text{ext} = \\ 
-        & = \int\limits_\Omega \left( \uusigma_n + \uuuuC : (\Deltaeps - \Deltaeps^p) \right) : \uueps(\uv) \, \md\Omega - \uF_\text{ext} 
-    \end{align}
-    where $\uF_\text{ext} = q \int\limits_{\partial\Omega_\text{inside}}\un \cdot \uv \, \md s $, $\Deltaeps = \uueps(\Delta\uu_n)$ and $\Deltaeps = \uueps^p(\Delta\uu_n)$
-
-    \begin{align}
-        & \uueps(\Delta\uu_n) = \frac{1}{2} \left( \nabla\Delta\uu + \nabla\Delta\uu^T \right) \\
-        & \uueps^p(\Delta\uu_n) = 
-            \begin{cases}
-                \Delta p_n \left( \frac{3}{2}\frac{\uusnelas}{\sigmaeqnelas} + \alpha \uuUnit \right), & \text{ if } f(\uusigma^\text{elas}, p_n) > 0  \\
-                0, & \text{ otherwise}
-            \end{cases}
-    \end{align}
-    where $\Delta p_n = p_{n+1} - p_n$ 
-
-    \begin{align}
-        & \uueps^p(\Delta\uu) = \uueps^p(\Delta\uu, p_n, p_{n+1}, \uusigma_n)
-    \end{align}
-
-    \begin{align}
-        & F(\Delta\uu, \uv) = \int\limits_\Omega \left( \uusigma_n + \uuuuC : (\uueps(\Delta\uu) - \uueps^p(\Delta\uu)) \right) : \uueps(\uv) \, \md\Omega - \uF_\text{ext} \\
-        & J(\uu, \uv) = \frac{\partial F(\Delta\uu, \uv)}{\partial\Delta\uu}(\uu)
-    \end{align}
-
 \end{appendices}
 
 
