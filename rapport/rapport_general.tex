@@ -365,7 +365,7 @@ The variational equation~\eqref{eqn:var_from_2} is nonlinear, that can be solved
 Newton algorithm. The linearized problem looks like this one
 \begin{align}
     & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:lin_var_from_1} \\ 
-    & \int\limits_\Omega \left(\frac{\partial\uusigma(\uueps(\Delta\uu))}{\partial\uueps} : \uueps(\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x + F_\text{ext}(\uv) \label{eqn:lin_var_from_2},
+    & \int\limits_\Omega \left(\frac{\partial\uusigma(\uueps(\Delta\uu))}{\partial\Delta\uueps} : \uueps(\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma(\uu) : \uueps(\uv) \, \md x + F_\text{ext}(\uv) \label{eqn:lin_var_from_2},
     % & J(\uu) = R^\prime(\uu) = -R(\uu), \\
 \end{align}
 % where we define $J(\uu)$ the derivative of $R(\uu)$ with respect to $\uu$.
@@ -384,17 +384,17 @@ Let's write down the introduced above problems in its discret forms, but firstly
     & \Delta p = -\Delta\lambda\frac{\partial f}{\partial p} (\uusigman, p_{n+1}), \\
     & \Delta\lambda \geq 0, \quad f(\uusigman, p_{n+1}) \leq 0, \quad \Delta\lambda\cdot f(\uusigman, p_{n+1}) = 0, \label{eqn:return_mapping_end}
 \end{align}
-where the increment $\Delta\uueps$ depends on the displacement $\Delta\uu$ calculated on a current loading step, $\uusigmanelas$ is an elastic trial stress, $\Delta\uusigma$ and $\Delta p$ are the stress and plastic strain corrections respectively, $\Delta\uueps^p$ is an increment of plastic strain. 
+where the increment $\Delta\uueps = \uueps(\Delta\uu)$ depends on the displacement $\Delta\uu$ calculated on a current loading step, $\uusigmanelas$ is an elastic trial stress, $\Delta\uusigma$ and $\Delta p$ are the stress and plastic strain corrections respectively, $\Delta\uueps^p$ is an increment of plastic strain. 
 % Increments $\Delta\uusigma, \Delta p$ and $\Delta\lambda$ can be found using the second Newton method, the local one.
 Then we write out a discrete form of the variational problem~\eqref{eqn:var_from_1}--\eqref{eqn:var_from_2}:
 \begin{align}
     & \text{Find } \uu_{n+1} \in V \text{ such that,} \label{eqn:var_disc_from_1} \\ 
     & R(\uu_{n+1}) = \int\limits_\Omega\uusigma(\uu_{n+1}) : \uueps(\uv) \, \md x - F_{n+1}^\text{ext}(\uv) = 0, \quad \forall \uv \in V \label{eqn:var_disc_from_2},
 \end{align}
-and its linearized version~\eqref{eqn:lin_var_from_1}--\eqref{eqn:lin_var_from_2} by denoting the derivate $\frac{\partial\uusigma}{\partial\uueps}$ by $\uuuuC{}_{\text{tang}}$:
+and its linearized version~\eqref{eqn:lin_var_from_1}--\eqref{eqn:lin_var_from_2} by denoting the derivate $\frac{\partial\uusigma}{\partial\Delta\uueps}$ by $\uuuuC{}_{\text{tang}}$:
 \begin{align}
     & \text{Find } \Delta\uu \in V \text{ such that,} \label{eqn:lin_var_disc_from_1} \\ 
-    & \int\limits_\Omega \left(\uuuuC{}_{n+1}^\text{tang} : \uueps(\Delta\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma_{n+1} : \uueps(\uv) \, \md x + F^\text{ext}_{n+1} \label{eqn:lin_var_disc_from_2},
+    & \int\limits_\Omega \left(\uuuuC{}_{n+1}^\text{tang} : \uueps(\Delta\uu)\right) : \uueps(\uv) \, \md x = -\int\limits_\Omega\uusigma_{n+1} : \uueps(\uv) \, \md x + F^\text{ext}_{n+1}(\uv) \label{eqn:lin_var_disc_from_2},
 \end{align}
 where $\uuuuC{}_{n+1}^{\text{tang}}$ is a the forth-rank tangent stiffness tensor on the $n+1$ loading step.
 
@@ -418,8 +418,8 @@ In total, we follow the next algorithm to solve elastoplastic constitutive equat
         \begin{enumerate}
             \item Solve the linearized problem~\eqref{eqn:lin_var_disc_from_1}--\eqref{eqn:lin_var_disc_from_2} using finite element method
             \item Calculate $\uusigmanelas$ 
-            \item Carry out the return-mapping procedure using the internal Newton method and solve the system~\eqref{eqn:return_mapping_begin}--\eqref{eqn:return_mapping_end}, if the yield condition $f(\uusigman, p_{n+1}) > 0$ is true
-            \item Update $\uusigman = \uusigmanelas - \Delta\uusigma$, $p_{n+1} = p_n + \Delta p$ and $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
+            \item Carry out the return-mapping procedure using the internal Newton method and solve the system~\eqref{eqn:return_mapping_begin}--\eqref{eqn:return_mapping_end}, if the yield condition $f(\uusigman^\text{elas}, p_{n+1}) > 0$ is true
+            \item Update $\uusigman = \uusigmanelas - \Delta\uusigma$, $p_{n+1} = p_n + \Delta p$ and $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\Delta\uueps}$
         \end{enumerate}
         \item Update the total displacement vector $\uu_{n+1} = \uu_n + \Delta\uu$
     \end{enumerate}
@@ -474,6 +474,8 @@ where $H$ is an isotropic hardening modulus and $\uusigmanelas = \uusigma_n + \u
 
 Thus, the solution $(\uusigma^*, p^*)$ of the problem~\eqref{eqn:conic_problem} is the closest projection of $(\uusigmanelas, p_{n+1}^\text{elas})$ on the yield surface with respect to the distance induced by $\uuuuS$ and $H$, i.e. $(\uusigma_{n+1}, p_{n+1})$.
 
+% Note that the free energy $F$ doesn't depend on the plasticity criterion. In order to change the plasticity model, it is enough to change the constraint of the optimization problem~\eqref{eqn:conic_problem}. This makes solving plasticity problems using convex optimization approach more general compared to the application of standard return-mapping procedure. In this regard, it is impossible to know in advance the stress derivative, which is necessary for the Newton method, so we use the quasi-Newton one here. As a result, the algorithm of the convex plasticity approach consists of the following steps:
+
 By analogy with the previous section~\ref{sec:theory:classical_plasticity}, we describe an algorithm for solving elastoplastic constitutive equations~\eqref{eqn:eps_dec}--\eqref{eqn:bc} using convex optimization:
 % % equations of the original problem
 \begin{enumerate}
@@ -486,7 +488,7 @@ By analogy with the previous section~\ref{sec:theory:classical_plasticity}, we d
             \item Calculate $\uusigmanelas$ 
             \item Carry out the return-mapping procedure by solving the conic optimization problem~\eqref{eqn:conic_problem}, if the yield condition $f(\uusigmanelas, p_{n+1}) > 0$ is true
             % \item Update $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
-            \item Update $\uusigman = \uusigmanelas - \Delta\uusigma$, $p_{n+1} = p_n + \Delta p$ and $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\uueps}$
+            \item Update $\uusigman = \uusigmanelas - \Delta\uusigma$, $p_{n+1} = p_n + \Delta p$ and $\uuuuC{}^\text{tang}_{n+1} = \frac{\partial \uusigman}{\partial\Delta\uueps}$ 
         \end{enumerate}
         \item Update the total displacement vector $\uu_{n+1} = \uu_n + \Delta\uu$
     \end{enumerate}
@@ -581,18 +583,18 @@ In this particular case, the return-mapping procedure can be performed analytica
 \begin{align}
     &\Delta p = 
     \begin{cases}
-        \frac{1}{3\mu + H}, & \text{if } f_\text{elas} \geq 0,\\
+        \frac{1}{3\mu + H}, & \text{if } f(\uusigma^\text{elas}_{n+1}, p_{n+1}) \geq 0,\\
         0, & \text{otherwise},
     \end{cases} \label{eqn:dp_von_mises}\\
-    &\Delta\uusigma = \beta\uusn, \label{eqn:dsigma_von_mises}
+    &\Delta\uusigma = \beta_{n+1}\uusn, \label{eqn:dsigma_von_mises}
 \end{align}
-where $\beta = \frac{3\mu}{\sigmaeqnelas}\Delta p$.
+where $\beta_{n+1} = \frac{3\mu}{\sigmaeqnelas}\Delta p$.
 
 The stress derivative is written with the following formula
 \begin{equation}
-    \dfrac{\md\uusigman}{\md\uuDeltaeps} = \uuuuC{}_{n+1}^{\text{tang}} = \uuuuC{} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta \right) \uuN \otimes \uuN - 2\mu\beta\uuuuJ \label{eqn:C_tang_von_mises}
+    \dfrac{\md\uusigman}{\md\Delta\uueps} = \uuuuC{}_{n+1}^{\text{tang}} = \uuuuC{} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta_{n+1} \right) \uuN_{n+1} \otimes \uuN_{n+1} - 2\mu\beta_{n+1}\uuuuJ \label{eqn:C_tang_von_mises}
 \end{equation}
-where $\uuN = \frac{\uus^\text{elas}_{n+1}}{\uusigmanelas}$.
+where $\uuN_{n+1} = \frac{\uus^\text{elas}_{n+1}}{\uusigmanelas}$.
 
 So we can explicitly write out the linearization of the variational problem~\eqref{eqn:cylinder_var_1}--\eqref{eqn:cylinder_var_2}
 \begin{align}
@@ -784,14 +786,14 @@ Using the \mypython{interpolate_quadrature} function, we calculate the values of
 
 Before moving on to convex plasticity approach, we would like to talk about another way to implement the classical one. The fact is that we can differentiate UFL expressions using the \mypython{ufl.derivative} function. If we can write down a weak formulation~\eqref{eqn:cylinder_var_1}--\eqref{eqn:cylinder_var_2}, then we could use external Newton methods (for example, SNES from the \mypython{petsc} library) and pass them the derivative $R^\prime(\uu)$ instead of calculating it manually by finding the $\uuuuC{}_{n+1}^\text{tang}$ expression. To do this, it is necessary to rewrite the original variational problem in the following form
 \begin{align}
-    & \text{Find } \uu \text{ such that} \label{eqn:cylinder_SNES_var_1} \\
+    & \text{Find } \uu_{n+1} \text{ such that} \label{eqn:cylinder_SNES_var_1} \\
     & R = \int\limits_\Omega \uusigman : \uueps(\uv) \, \md\Omega - \uF_{n+1}^\text{ext}(\uv) = \int\limits_\Omega \left( \uusigma_n + \uuuuC{} : (\Delta\uueps - \Delta\uueps^p) \right) : \uueps(\uv) \, \md\Omega - \uF_{n+1}^\text{ext}(\uv) = 0, \label{eqn:cylinder_SNES_var_2}
 \end{align}
-where $\Delta\uueps = \uueps(\Delta\uu)$ and the plastic deformation increment $\Delta\uueps^p = \uueps^p(\Delta\uu)$ actually contains a return-mapping algorithm inside. Explicitly it can be written out as follows
+where $\uusigman = \uusigma(\uu_{n+1})$, $\uu_{n+1} = \uu_{n} + \Delta\uu$, $\Delta\uueps = \uueps(\Delta\uu)$ and the plastic deformation increment $\Delta\uueps^p = \uueps^p(\Delta\uu)$ actually contains a return-mapping algorithm inside. Explicitly it can be written out as follows
 \begin{equation}
     \Delta\uueps^p = 
         \begin{cases}
-            \Delta p \left( \frac{3}{2}\frac{\uusnelas} {\sigmaeqnelas} \right), & \text{ if } f(\uusigmanelas, p_n) > 0,  \\
+            \Delta p \left( \frac{3}{2}\frac{\uusnelas} {\sigmaeqnelas} \right), & \text{ if } f(\uusigmanelas, p_{n+1}) > 0,  \\
             0, & \text{ otherwise}.
         \end{cases}
 \end{equation}
@@ -874,7 +876,7 @@ Although we use the quasi-Newton method to find the solution of~\eqref{eqn:cylin
 
 % In both cases, custom assembling would significantly speed up calculations.
 
-In addition to the inconveniences described above, we are faced with the problem of excessive memory allocation. For example, in the classic approach we are forced to save global variables $\beta$ and $\bN$. If there is a mesh containing $N_\text{elements}$ elements, we have to allocate memory for a vector with the size $N_\text{elements}*3$ for the scalar field $\beta$ from \mypython{W0} finite space and another one with the size $N_\text{elements}*3*4$ for the vector field $\bN$ from \mypython{W} finite space. At the same time they are intermediate variables, necessary only for the calculation of the stress tensor and its derivative. So we would like to avoid such a waste of memory.
+In addition to the inconveniences described above, we are faced with the problem of excessive memory allocation. For example, in the classic approach we are forced to save global variables $\beta_{n+1}$ and $\bN$. If there is a mesh containing $N_\text{elements}$ elements, we have to allocate memory for a vector with the size $N_\text{elements}*3$ for the scalar field $\beta_{n+1}$ from \mypython{W0} finite space and another one with the size $N_\text{elements}*3*4$ for the vector field $\bN$ from \mypython{W} finite space. At the same time they are intermediate variables, necessary only for the calculation of the stress tensor and its derivative. So we would like to avoid such a waste of memory.
 
 % \todounderline{Write about global Ctang?}
 
@@ -1010,7 +1012,7 @@ The following example optimizes the classical approach solving the von Mises pla
 % We focus on the following variational problem only: Find $\underline{\Delta u} \in V$ s.t.
 % $$ \int\limits_\Omega \underline{\underline{\sigma_{n+1}}} (\underline{\underline{\varepsilon}}(\underline{\Delta u})) : \underline{\underline{\varepsilon}}(\underline{v}) dx - q \int\limits_{\partial\Omega_{\text{inside}}} \underline{n} \cdot \underline{v} dx = 0, \quad \forall \underline{v} \in V, $$
 % where $\underline{\Delta u}$ is a displacement increment between two load steps, $\uusigma_{n+1}$ is the current stress tensor which depends on the previous stress $\uusigma_n$ and the previous plastic strain $p_n$ and which is implicitly defined as the solution to the following equations:
-We can conclude from this, that the fields $\underline{\underline{\sigma_{n+1}}} = \underline{\underline{\sigma_{n+1}}}(\underline{\underline{\Delta\varepsilon}}, \beta, \uuN, dp, p_n, \underline{\underline{\sigma_n}})$ and $\mathbf{C}^\text{tang} = \mathbf{C}^\text{tang}(\beta, \uuN)$ depend on the common variables $\beta$ and $\uuN$. With the previous implementation, it was necessary to allocate additional space for them and calculate $\underline{\underline{\sigma_{n+1}}}$ and $\mathbf{C}^\text{tang}$ separately, but now we can combine their local evaluations.
+We can conclude from this, that the fields $\uusigman = \uusigman(\Delta\uueps, \beta_{n+1}, \uuN_{n+1}, dp, p_n, \uusigma_n)$ and $\mathbf{C}^\text{tang}_{n+1} = \mathbf{C}^\text{tang}_{n+1}(\beta_{n+1}, \uuN_{n+1})$ depend on the common variables $\beta_{n+1}$ and $\uuN_{n+1}$. With the previous implementation, it was necessary to allocate additional space for them and calculate $\uusigman$ and $\mathbf{C}^\text{tang}_{n+1}$ separately, but now we can combine their local evaluations.
 
 In comparison with the elasticity case the \mypython{CustomExpression} \mypython{sig} has more dependent fields. Look at the code below
 
@@ -1072,7 +1074,7 @@ As it was expected, the local evaluation of the \mypython{CustomExpression} beco
         return eval
 \end{pythoncode}
 
-Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\text{tang}$ on the calculation of the tensor $\uusigma_{n+1}$. The full source code of this examples can be found in the \mypython{assembling_strategies} folder of the repository~\parencite{convex-plasticity}.
+Thus it can been seen more clearly the dependance of the tensor $\mathbf{C}^\text{tang}_{n+1}$ on the calculation of the tensor $\uusigma_{n+1}$. The full source code of this examples can be found in the \mypython{assembling_strategies} folder of the repository~\parencite{convex-plasticity}.
 
 Finally we developed our own custom assembler which makes use of two new entities. This allows us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFL functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FEniCSx features, we can implement our ideas by way of efficient code. 
 % Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
@@ -1324,9 +1326,9 @@ The framework code is publicly available: \parencite{convex-plasticity}.
     Combining the equations~\eqref{eqn:epsp_disc}--\eqref{eqn:sigma_disc} and~\eqref{eqn:delta_p} together we can derive the final expression of $\uusigma_{n+1}$:
     \begin{equation}
         % & \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - 2\mu \Delta\uue^p - \kappa \mtr (\Delta\uueps^p) \uuUnit \\
-        \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - \left( \beta \uusnelas + 3k\alpha \Delta p \uuUnit \right),
+        \uusigma_{n+1} = \uusigma_{n+1}^\text{elas} - \left( \beta_{n+1} \uusnelas + 3k\alpha \Delta p \uuUnit \right),
     \end{equation}
-    where $\beta = 3\mu\frac{\Delta p}{\sigmaeqnelas}$.
+    where $\beta_{n+1} = 3\mu\frac{\Delta p}{\sigmaeqnelas}$.
 
     As has been repeatedly pointed out in the text, an important element of the numerical solution of plasticity problems is the stress-strain derivative. In the case of the Drucker-Prager criterion, we can calculate it analytically. This means that we need to find an explicit expression for 
     \begin{equation*}
@@ -1342,19 +1344,19 @@ The framework code is publicly available: \parencite{convex-plasticity}.
         % & \frac{\partial (\mtr (\Delta\uueps^p) )}{\partial \Delta\uueps} = \uuUnit \\
         % & \frac{\partial \Delta\uueps^p}{\partial \Delta\uueps} = \frac{\partial}{\partial \Delta\uueps} \left( \frac{\Delta p}{\sqrt{1 + 2\alpha^2}} \left( \frac{3}{2} \frac{\uusn}{\sigmaeqn} + \alpha \uuUnit \right)  \right) \\
         % & 2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit = \Delta p\left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \\
-        & \frac{\partial\Delta p}{\partial\Delta\uueps} = \frac{1}{\gamma} \frac{\partial(\sigmaeqnelas + \alpha \mtr \uusigmanelas)}{\partial\Delta\uueps} = \frac{1}{\gamma} \left( \frac{3\mu}{\sigmaeqnelas}\uusnelas + 3k\alpha\uuUnit \right) = \frac{1}{\gamma}(3\mu \uuN + 3k\uuUnit),
+        & \frac{\partial\Delta p}{\partial\Delta\uueps} = \frac{1}{\gamma} \frac{\partial(\sigmaeqnelas + \alpha \mtr \uusigmanelas)}{\partial\Delta\uueps} = \frac{1}{\gamma} \left( \frac{3\mu}{\sigmaeqnelas}\uusnelas + 3k\alpha\uuUnit \right) = \frac{1}{\gamma}(3\mu \uuN_{n+1} + 3k\uuUnit),
     \end{align}
-    where $\uuN = \frac{\uus^\text{elas}_{n+1}}{\sigmaeqnelas} = \frac{\uus_{n+1}}{\sigmaeqn}$.
+    where $\uuN_{n+1} = \frac{\uus^\text{elas}_{n+1}}{\sigmaeqnelas} = \frac{\uus_{n+1}}{\sigmaeqn}$.
     Then we use these expressions to get $\uuuuD$:
     \begin{align*}
         % & \frac{\partial\uusigman}{\partial \Delta\uueps} = \uuuuC{} - \frac{\partial (2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit)}{\partial\Delta\uueps} = \uuuuC{} - \uuuuD \\
         & \uuuuD = \frac{\partial (2\mu\Delta\uue^p + k\mtr\Delta\uueps^p\uuUnit)}{\partial\Delta\uueps} = \frac{\partial }{\partial \Delta\uueps} \left( \Delta p \left( 3\mu \frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit  \right) \right) = \\
         & = \left( \frac{\partial\Delta p}{\partial\Delta\uueps} \otimes \left( 3\mu\frac{\uusnelas}{\sigmaeqnelas} + 3k\alpha \uuUnit \right) + \Delta p \left(3\mu\frac{\partial\uusnelas}{\partial\Delta\uueps}\frac{1}{\sigmaeqnelas} \right) - \Delta p 3\mu\frac{\uusnelas}{(\sigmaeqnelas)^2} \otimes \frac{\partial\sigmaeqnelas}{\partial\Delta\uueps}\right) = \\
-        & = \left( \left( 3\mu \uuN + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( 3\mu \uuN + 3\alpha k \uuUnit \right) + 2\mu\beta\uuuuK - 3\mu\beta\uuN \otimes \uuN \right), \\
-        & \uuuuD = \left( 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uuN \otimes \uuN + \frac{9\alpha\mu k}{\gamma} (\uuUnit \otimes \uuN + \uuN \otimes \uuUnit) + \frac{9\alpha^2k^2}{\gamma} \uuUnit \otimes \uuUnit + 2\mu\beta \uuuuK \right)
-        % & \uuuuD : \Delta\uueps = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \uuN : \Delta\uueps \left( \frac{9\alpha\mu k}{\gamma}\uuUnit + 3\mu\left(\frac{3\mu}{\gamma} - \beta\right)\uuN \right) + \mtr \Delta\uueps \left( \frac{9\alpha\mu k}{\gamma}  \uuN + \frac{9\alpha^2k^2}{\gamma} \uuUnit \right) + 2\mu\beta \Delta\uue^p \right) \\
+        & = \left( \left( 3\mu \uuN_{n+1} + 3\alpha k \uuUnit \right) \frac{1}{\gamma} \otimes \left( 3\mu \uuN_{n+1} + 3\alpha k \uuUnit \right) + 2\mu\beta_{n+1}\uuuuK - 3\mu\beta_{n+1}\uuN_{n+1} \otimes \uuN_{n+1} \right), \\
+        & \uuuuD = \left( 3\mu\left(\frac{3\mu}{\gamma} - \beta_{n+1}\right)\uuN_{n+1} \otimes \uuN_{n+1} + \frac{9\alpha\mu k}{\gamma} (\uuUnit \otimes \uuN_{n+1} + \uuN_{n+1} \otimes \uuUnit) + \frac{9\alpha^2k^2}{\gamma} \uuUnit \otimes \uuUnit + 2\mu\beta_{n+1} \uuuuK \right)
+        % & \uuuuD : \Delta\uueps = \frac{1}{\sqrt{1 + 2\alpha^2}}\left( \uuN_{n+1} : \Delta\uueps \left( \frac{9\alpha\mu k}{\gamma}\uuUnit + 3\mu\left(\frac{3\mu}{\gamma} - \beta_{n+1}\right)\uuN_{n+1} \right) + \mtr \Delta\uueps \left( \frac{9\alpha\mu k}{\gamma}  \uuN_{n+1} + \frac{9\alpha^2k^2}{\gamma} \uuUnit \right) + 2\mu\beta_{n+1} \Delta\uue^p \right) \\
         % & \uuuuD : \Delta\uueps = \\
-        % & = \left( \uuN : \Delta\uueps 3\mu \left( \frac{3\mu}{\gamma} - \beta \right) \uuN + \frac{9\alpha\mu k}{\gamma} (\uuN : \Delta\uueps \uuUnit + \mtr\Delta\uueps \uuN) + \frac{9\alpha^2k^2}{\gamma} \mtr \Delta\uueps \uuUnit + 2\mu\beta \Delta\uue^p \right)  \\
+        % & = \left( \uuN_{n+1} : \Delta\uueps 3\mu \left( \frac{3\mu}{\gamma} - \beta_{n+1} \right) \uuN_{n+1} + \frac{9\alpha\mu k}{\gamma} (\uuN_{n+1} : \Delta\uueps \uuUnit + \mtr\Delta\uueps \uuN_{n+1}) + \frac{9\alpha^2k^2}{\gamma} \mtr \Delta\uueps \uuUnit + 2\mu\beta_{n+1} \Delta\uue^p \right)  \\
     \end{align*}
 
     Thus, we have derived the analytical formulas necessary for the return-mapping procedure in the case of the Drucker-Prager yield criterion. Substituting zero instead of the alpha parameter in the formulas above, we get exactly the analytical expressions for the von Mises criterion presented in the section~\ref{sec:problem_formulation}.

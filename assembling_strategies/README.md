@@ -7,7 +7,7 @@ We consider the following typical non-linear problem in our study:
 Find $\underline{u} \in V$, such that
 
 $$ F(\underline{u}) = \int_\Omega \underline{\underline{\sigma}}(\underline{u}) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{f} \underline{v} dx = 0 \quad \forall \underline{v} \in V,$$
-where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFLx. Let us show you some examples
+where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFL. Let us show you some examples
 
 - $\underline{\underline{\sigma}}(\underline{u}) = f(\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III})$,
 - $\underline{\underline{\sigma}}(\underline{u}) = \underset{\alpha}{\operatorname{argmin}} g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
@@ -18,11 +18,11 @@ As seen in the second example, $\ \underline{\underline{\sigma}}(\underline{u}) 
 
 In addition, in order to use a standard Newton method to find the solution of $\ F(\underline{u})=0 $, we also need to compute the derivative of $\ \underline{\underline{\sigma}} $ with respect to $\ \underline{u} $. The latter may also depend on some internal variables $\ \alpha $ of $\ \underline{\underline{\sigma}} $. Thus, it is necessary to have a fonctionality which will allow to do a simultaneous calculation of $\ \underline{\underline{\sigma}}$ and its derivative during assembling procedure.
 
-In practice, in the previous examples $\ \underline{\underline{\sigma}} $ depends directly on $\ \underline{\underline{\varepsilon}} = \frac{1}{2}(\nabla \underline{u} + \nabla \underline{u}^T) $. As a result, it is more natural to consider the non-linear expression as a function of $\ \underline{\underline{\varepsilon}} $ directly, provide an expression for $\ \dfrac{d\underline{\underline{\sigma}}}{d\underline{\underline{\varepsilon}}} $ and evaluate $\ \dfrac{d\underline{\underline{\sigma}}}{d\underline{u}} $ by the chain rule (letting UFLx handle the $\ \dfrac{d\underline{\underline{\varepsilon}}}{d\underline{u}} $ part).
+In practice, in the previous examples $\ \underline{\underline{\sigma}} $ depends directly on $\ \underline{\underline{\varepsilon}} = \frac{1}{2}(\nabla \underline{u} + \nabla \underline{u}^T) $. As a result, it is more natural to consider the non-linear expression as a function of $\ \underline{\underline{\varepsilon}} $ directly, provide an expression for $\ \dfrac{d\underline{\underline{\sigma}}}{d\underline{\underline{\varepsilon}}} $ and evaluate $\ \dfrac{d\underline{\underline{\sigma}}}{d\underline{u}} $ by the chain rule (letting UFL handle the $\ \dfrac{d\underline{\underline{\varepsilon}}}{d\underline{u}} $ part).
 
 As the result we require the following features:
 
-1. To define nonlinear expressions of variational problems in more complex way than it's allowed by UFLx
+1. To define nonlinear expressions of variational problems in more complex way than it's allowed by UFL
 2. To let an "oracle" provide values of such an expression and its derivative(s)
 3. To call this oracle on-the-fly during the assembly to avoid unnecessary loops, precomputations and memory allocations
 
@@ -40,7 +40,7 @@ We would like to introduce a concept of `CustomFunction` (for lack of a better n
 
 $$ \int_\Omega g \cdot uv dx, \quad \forall \underline{v} \in V, $$
 
-where $\ \underline{u} $ is a trial function, $\ \underline{v} $ is a test function and the function $\ g $ is an expression. For this moment we must use `fem.Function` class to implement this variational form. Knowing the exact UFLx expression of $\ g $ we can calculate its values on every element using the interpolation procedure of `fem.Expression` class. So we save all values of $\ g $ in one global vector. The goal is to have a possibility to calculate $\ g $ expression, no matter how difficult it is, in every element node (for instance, in every gauss point, if we define $\ g $ on a quadrature element) during the assembling procedure. 
+where $\ \underline{u} $ is a trial function, $\ \underline{v} $ is a test function and the function $\ g $ is an expression. For this moment we must use `fem.Function` class to implement this variational form. Knowing the exact UFL expression of $\ g $ we can calculate its values on every element using the interpolation procedure of `fem.Expression` class. So we save all values of $\ g $ in one global vector. The goal is to have a possibility to calculate $\ g $ expression, no matter how difficult it is, in every element node (for instance, in every gauss point, if we define $\ g $ on a quadrature element) during the assembling procedure. 
 
 We introduce a new entity named as `CustomFunction` (or `CustomExpression`). It
 1. inherits `fem.Function`
@@ -217,7 +217,7 @@ Thus it can been seen more clearly the dependance of the tensor $\ \mathbf{C}^\t
 
 ## Summarize
 
-We developed our own custom assembler which makes use of two new entities. This allows us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFLx functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
+We developed our own custom assembler which makes use of two new entities. This allows us to save memory, avoid unnecessary global *a priori* evaluations and do instead on-the-fly evaluation during the assembly. More importantly, this allows to deal with more complex mathematical expressions, which can be implicitly defined, where the UFL functionality is quite limited. Thanks to `numba` and `cffi` python libraries and some FenicsX features, we can implement our ideas by way of efficient code. Our realization doesn't claim to be the most efficient one. So, if you have any comments about it, don't hesitate to share them with us!
 
 ## Miscellaneous
 

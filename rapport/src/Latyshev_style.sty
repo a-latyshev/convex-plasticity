@@ -1,5 +1,7 @@
 \ProvidesPackage{Latyshev_style.sty}
 
+\usepackage{bm}
+
 \newcommand\ul[1]{\underline{#1}}
 \newcommand\uul[1]{\ul{\ul{#1}}}
 \newcommand\uuuul[1]{\ul{\ul{\ul{\ul{#1}}}}}
@@ -48,8 +50,8 @@
 
 \newcommand\mathbold[1]{\mbox{\boldmath $#1$}}
 \newcommand{\beps}{\mbox{\boldmath $\varepsilon$}}
-\newcommand{\bsigma}{\mbox{\boldmath$\sigma$}}
-\newcommand{\bSigma}{\mathbold{\Sigma}}
+\newcommand{\bsigma}{\mathbold{\sigma}}
+\newcommand{\bSigma}{\bm{\Sigma}}
 \newcommand{\bC}{\mathbold{C}}
 \newcommand{\bS}{\mathbold{S}}
 \newcommand{\bF}{\mathbold{F}}
