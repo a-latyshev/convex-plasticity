@@ -1,6 +1,9 @@
+from . import plasticity_framework as pf
+from . import convex_return_mapping as crm
+from . import utility_functions as uf
+
 import cffi
 import numba
-import numpy as np
 
 import ufl
 from dolfinx.jit import ffcx_jit
@@ -13,16 +16,12 @@ from mpi4py import MPI
 from petsc4py import get_config as PETSc_get_config
 from petsc4py import PETSc
 
+import numpy as np
 from typing import Optional, List, Dict, Union, Callable
 import basix
 import os 
 import logging
 
-import sys
-sys.path.append('../optimisation/')
-import plasticity_framework as pf
-import convex_return_mapping as crm
-import utility_functions as uf
 
 from numba.core.errors import NumbaPendingDeprecationWarning
 import warnings

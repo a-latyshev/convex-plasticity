@@ -193,7 +193,7 @@ class ReturnMapping:
         self.C_tang = np.zeros((N, 4, 4))
 
         S = np.linalg.inv(material.C)
-        delta_sig = self.sig - sig_elas
+        # delta_sig = self.sig - sig_elas
         # energy = []
         # for i in range(N):
         #     energy.append(cp.quad_form(delta_sig[:, i], S))
@@ -201,21 +201,21 @@ class ReturnMapping:
         
         # energy = cp.sum(cp.diag(delta_sig.T @ S_sparsed @ delta_sig))
         
-        S_sparsed = block_diag([S for _ in range(N)])
-        delta_sig_vector = cp.reshape(delta_sig, (N*4))
+        # S_sparsed = block_diag([S for _ in range(N)])
+        # delta_sig_vector = cp.reshape(delta_sig, (N*4))
 
-        elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed)
-        # target_expression = 0.5*elastic_energy + 0.5*material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
-        D = material.yield_criterion.H * np.eye(N)
-        target_expression = 0.5*elastic_energy + 0.5*cp.quad_form(self.p - self.p_old, D)
+        # elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed)
+        # # target_expression = 0.5*elastic_energy + 0.5*material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
+        # D = material.yield_criterion.H * np.eye(N)
+        # target_expression = 0.5*elastic_energy + 0.5*cp.quad_form(self.p - self.p_old, D)
 
-        constrains = material.yield_criterion.criterion(self.sig, self.p) 
+        # constrains = material.yield_criterion.criterion(self.sig, self.p) 
 
-        if material.plane_stress:
-            constrains.append(self.sig[2] == 0) #TO MODIFY!
+        # if material.plane_stress:
+        #     constrains.append(self.sig[2] == 0) #TO MODIFY!
 
-        self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
-        self.solver = solver
+        # self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
+        # self.solver = solver
     
     def solve(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.

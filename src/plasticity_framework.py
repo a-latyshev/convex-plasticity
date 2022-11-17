@@ -1,21 +1,16 @@
-import convex_return_mapping as crm # there is a conflict in the oder of imported modules
-import meshio
-import numpy as np
+from . import convex_return_mapping as crm # there is a conflict in the order of imported modules
+from . import fenicsx_support as fs
+from . import utility_functions as uf
 
+import meshio
 import ufl
 from dolfinx import fem, io, common
 from mpi4py import MPI
 from petsc4py import PETSc
 
+import numpy as np
 from typing import List, Union, Dict, Optional, Callable
-
 import time
-
-import sys
-sys.path.append("../")
-import fenicsx_support as fs
-import utility_functions as uf
-
 import logging
 LOG_INFO_STAR = logging.INFO + 5
 
