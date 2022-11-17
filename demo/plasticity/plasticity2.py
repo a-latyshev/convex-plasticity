@@ -20,8 +20,9 @@ import numpy as np
 
 # %%
 if MPI.COMM_WORLD.rank == 0:
+
     #It works with the msh4 only!!
-    msh = meshio.read("../mesh/thick_cylinder.msh")
+    msh = meshio.read("mesh/thick_cylinder.msh")
 
     # Create and save one file for the mesh, and one file for the facets 
     triangle_mesh = fs.create_mesh(msh, "triangle", prune_z=True)
@@ -159,8 +160,8 @@ Nincr = 20
 load_steps = np.linspace(0, 1.1, Nincr+1)[1:]**0.5
 results = np.zeros((Nincr+1, 2))
 load_steps = load_steps
-xdmf = io.XDMFFile(MPI.COMM_WORLD, "output.xdmf", "w", encoding=io.XDMFFile.Encoding.HDF5)
-xdmf.write_mesh(mesh)
+# xdmf = io.XDMFFile(MPI.COMM_WORLD, "plasticity.xdmf", "w", encoding=io.XDMFFile.Encoding.HDF5)
+# xdmf.write_mesh(mesh)
 
 sig.vector.set(0.0)
 sig_old.vector.set(0.0)
@@ -174,9 +175,12 @@ sig_, n_elas_, beta_, dp_ = proj_sig(deps, sig_old, p)
 
 my_problem.assemble_matrix()
 
+return_mapping_times = np.zeros((len(load_steps)))
+
 start = time.time()
 
 for (i, t) in enumerate(load_steps):
+    return_mapping_times_tmp = []
     loading.value = t * q_lim
 
     my_problem.assemble_vector()
@@ -185,8 +189,8 @@ for (i, t) in enumerate(load_steps):
     nRes = nRes0
     Du.x.array[:] = 0
 
-    if MPI.COMM_WORLD.rank == 0:
-        print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {t * q_lim}")
+    # if MPI.COMM_WORLD.rank == 0:
+    #     print(f"\nnRes0 , {nRes0} \n Increment: {str(i+1)}, load = {t * q_lim}")
     niter = 0
 
     while nRes/nRes0 > tol and niter < Nitermax:
@@ -195,16 +199,20 @@ for (i, t) in enumerate(load_steps):
         Du.vector.axpy(1, du.vector) # Du = Du + 1*du
         Du.x.scatter_forward() 
 
+        start_interpolate = time.time()
+        
         fs.interpolate_quadrature(sig_, sig)
         fs.interpolate_quadrature(n_elas_, n_elas)
         fs.interpolate_quadrature(beta_, beta)
+
+        return_mapping_times_tmp.append(time.time() - start_interpolate)
 
         my_problem.assemble()
 
         nRes = my_problem.b.norm() 
 
-        if MPI.COMM_WORLD.rank == 0:
-            print(f"    Residual: {nRes}")
+        # if MPI.COMM_WORLD.rank == 0:
+        #     print(f"    Residual: {nRes}")
         niter += 1
     u.vector.axpy(1, Du.vector) # u = u + 1*Du
     u.x.scatter_forward()
@@ -215,26 +223,30 @@ for (i, t) in enumerate(load_steps):
     
     sig_old.x.array[:] = sig.x.array[:]
 
-    fs.project(p, p_avg)
+    # fs.project(p, p_avg)
     
-    xdmf.write_function(u, t)
-    xdmf.write_function(p_avg, t)
+    # xdmf.write_function(u, t)
+    # xdmf.write_function(p_avg, t)
+
+    return_mapping_times[i] = np.mean(return_mapping_times_tmp)
+    # print(f'rank#{MPI.COMM_WORLD.rank}: Time (mean return mapping) = {return_mapping_times[i]:.3f} (s)')
 
     if len(points_on_proc) > 0:
         results[i+1, :] = (u.eval(points_on_proc, cells)[0], t)
 
-xdmf.close()
-end = time.time()
+# xdmf.close()
+# end = time.time()
+# print(f'\n rank#{MPI.COMM_WORLD.rank}: Time (return mapping) = {np.mean(return_mapping_times):.3f} (s)')
 print(f'rank#{MPI.COMM_WORLD.rank}: Time = {time.time() - start:.3f} (s)')
 
 # %%
 if len(points_on_proc) > 0:
     import matplotlib.pyplot as plt
     plt.plot(results[:, 0], results[:, 1], "-o")
-    # plt.xlabel("Displacement of inner boundary")
-    # plt.ylabel(r"Applied pressure $q/q_{lim}$")
-    # plt.savefig(f"displacement_rank{MPI.COMM_WORLD.rank:d}.png")
-    # plt.show()
+    plt.xlabel("Displacement of inner boundary")
+    plt.ylabel(r"Applied pressure $q/q_{lim}$")
+    plt.savefig(f"displacement_rank{MPI.COMM_WORLD.rank:d}.png")
+    plt.show()
 
 # %%
 
