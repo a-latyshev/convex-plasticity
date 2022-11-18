@@ -850,7 +850,11 @@ class CustomProblem(pf.LinearProblem):
 
         fem.set_bc(self.b, self.bcs, x0=x0, scale=scale)
 
-    def solve(self) -> int:
+    def solve(
+        self,
+        scale: float = 1.0, 
+        x0: Optional[np.ndarray] = None
+    ) -> int:
         """Solves the linear system and saves the solution into the vector `du`
         
         Args:
@@ -861,8 +865,9 @@ class CustomProblem(pf.LinearProblem):
         with self.x0.localForm() as x0_local:
             x0_local.set(0.0)
 
-        self.assemble_Neumann()
-        self.assemble_vector()
+        if self.b_Neumann is not None:
+            self.assemble_Neumann()
+        self.assemble_vector(scale, x0)
     
         nRes0 = self.b.norm()
         nRes = nRes0
@@ -874,13 +879,12 @@ class CustomProblem(pf.LinearProblem):
             self.u.vector.axpy(1, self.du.vector) # Du = Du + 1*du
             self.u.x.scatter_forward() 
 
-            self.assemble()
+            self.assemble(scale, x0)
             
             nRes = self.b.norm() 
             niter += 1
             self.logger.debug(f'rank#{MPI.COMM_WORLD.rank}  Increment: {niter}, norm(Res/Res0) = {nRes/nRes0:.1e}.')
 
-        
         return niter
 
 class SNESCustomProblem(CustomProblem):
