@@ -174,7 +174,7 @@
     & \Delta\uusigma = \beta_{n+1}\uusn, \label{eqn:dsigma_von_mises} \\
     & \dfrac{\partial\uusigman}{\partial\Delta\uueps} = \uuuuC{}_{n+1}^{\text{tang}} = \uuuuC{} - 3\mu \left( \frac{3\mu}{3\mu + H} -\beta_{n+1} \right) \uuN_{n+1} \otimes \uuN_{n+1} - 2\mu\beta_{n+1}\uuuuJ \label{eqn:C_tang_von_mises}
   \end{align}
-  where $\beta_{n+1} = \frac{3\mu}{\sigmaeqnelas}\Delta p$, \quad $\uuN_{n+1} = \frac{\uus^\text{elas}_{n+1}}{\uusigmanelas}$ and $H$ is an isotropic hardening modulus.
+  where $\beta_{n+1} = \frac{3\mu}{\sigmaeqnelas}\Delta p$, \quad $\uuN_{n+1} = \frac{\uus^\text{elas}_{n+1}}{\sigmaeqnelas}$ and $H$ is an isotropic hardening modulus.
 
   % Linearization of the variational problem~\eqref{eqn:cylinder_var_1}--\eqref{eqn:cylinder_var_2}:
   % \begin{align}
@@ -287,7 +287,7 @@
   % where $H$ is an isotropic hardening modulus and $\uusigmanelas = \uusigma_n + \uuuuC{}:\Delta\uueps$ and $p^\text{elas}_{n+1} = p_n$ are elastic predictors.
 
   % Thus, the solution $(\uusigma^*, p^*)$ of the problem~\eqref{eqn:conic_problem} is the closest projection of $(\uusigmanelas, p_{n+1}^\text{elas})$ on the yield surface with respect to the distance induced by $\uuuuS$ and $H$, i.e. $(\uusigma_{n+1}, p_{n+1})$.
-  \textbf{von Mises} and \textbf{Drucker-Prager} criteria:
+  \textbf{von Mises} and \textbf{Drucker-Prager} criteria (second-order conic constraint): 
   \begin{equation}
       % \label{eqn:conic_problem}
       \begin{cases}
@@ -296,7 +296,7 @@
       \end{cases}
   \end{equation}
 
-  \textbf{Rankine} criterion:
+  \textbf{Rankine} criterion (semidefinite conic constraint):
   \begin{equation}
       \begin{cases}
           \min\limits_{\uusigma, p} F(\uusigma, p), \\
@@ -319,7 +319,7 @@
   \end{itemize}
   Convex optimization problem in a vectorized form:
   \begin{equation}
-    % \label{eqn:conic_problem_vectorized}
+    \label{eqn:conic_problem_vectorized}
     \begin{cases}
         \min\limits_{\bSigma, \bP} F(\bSigma, \bP), \\
         \mathbold{f}(\bSigma, \bP) \leq 0,
@@ -338,21 +338,18 @@
   We call the \textit{convex plasticity} or the convex optimization approach the one where the return-mapping algorithm is implemented by solving the optimization problem.
   \newline 
 
-  Convex optimization problem in a vectorized form:
-  \begin{equation}
-    \label{eqn:conic_problem_vectorized}
-    \begin{cases}
-        \min\limits_{\bSigma, \bP} F(\bSigma, \bP), \\
-        \mathbold{f}(\bSigma, \bP) \leq 0,
-    \end{cases}
-  \end{equation}
+  Variational problem:
+  \begin{align}
+    & \text{Find } \uu_{n+1} \in V \text{ such that,} \label{eqn:var_disc_from_1_double} \\ 
+    & R(\uu_{n+1}) = \int\limits_\Omega\uusigman : \uueps(\uv) \, \md x - F_{n+1}^\text{ext}(\uv) = 0, \quad \forall \uv \in V \label{eqn:var_disc_from_2_double},
+  \end{align}
 
   The algorithm includes following points:
   \begin{enumerate}
     \item Divide the external loading $F_\text{ext}$ on $N$ steps
     \item For each loading step $n+1 \in {1 \dots N}$:
     \begin{enumerate}
-        \item Solve the variational problem~\eqref{eqn:var_disc_from_1}--\eqref{eqn:var_disc_from_2} using the \textbf{quasi-Newton method}, where for each Newton iteration:
+        \item Solve the variational problem~\eqref{eqn:var_disc_from_1_double}--\eqref{eqn:var_disc_from_2_double} using the \textbf{quasi-Newton method}, where for each Newton iteration:
         \begin{enumerate}
             \item Find a numerical approximation of the derivative $J = R^\prime(\uu_{n+1})$, i.e. of the linearized problem~\eqref{eqn:lin_var_disc_from_1}--\eqref{eqn:lin_var_disc_from_2}
             \item Solve the latter using FEM
@@ -389,26 +386,26 @@
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Classical approach vs convex optimzation}
+% \begin{frame}
+%   \frametitle{Classical approach vs convex optimzation}
 
-  Classical approach:
-  \begin{itemize}
-    \item standard Newton method (SNES or a custom one)
-    \item analytical derivative $J = R^\prime(\uu_{n+1})$
-    \item return-mapping procedure via analytical expressions of $\Delta\uusigma, \Delta p, \uuuuC{}^\text{tang}_{n+1}$, etc
-    \item von Mises and Drucker-Prager criteria
-  \end{itemize}
+%   Classical approach:
+%   \begin{itemize}
+%     \item standard Newton method (SNES or a custom one)
+%     \item analytical derivative $J = R^\prime(\uu_{n+1})$
+%     \item return-mapping procedure via analytical expressions of $\Delta\uusigma, \Delta p, \uuuuC{}^\text{tang}_{n+1}$, etc
+%     \item von Mises and Drucker-Prager criteria
+%   \end{itemize}
   
-  Convex optimization:
-  \begin{itemize}
-    \item quasi-Newton method (SNESQN)
-    \item derivative approximation $J \approx R^\prime(\uu_{n+1})$
-    \item return-mapping procedure via convex optimization problem
-    \item SCS, MOSEK, ECOS conic solvers 
-    \item von Mises, Drucker-Prager and Rankine criteria
-  \end{itemize}
-\end{frame}
+%   Convex optimization:
+%   \begin{itemize}
+%     \item quasi-Newton method (SNESQN)
+%     \item derivative approximation $J \approx R^\prime(\uu_{n+1})$
+%     \item return-mapping procedure via convex optimization problem
+%     \item SCS, MOSEK, ECOS conic solvers 
+%     \item von Mises, Drucker-Prager (second-order conic constraint) and Rankine criteria (semidefinite conic constraint)
+%   \end{itemize}
+% \end{frame}
 
 \begin{frame}{Custom assembling: motivation}
   \begin{align}
@@ -418,7 +415,7 @@
   where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear for example:
   \begin{itemize}
     \item $\underline{\underline{\sigma}}(\underline{u}) = f(\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III})$,
-    \item $\underline{\underline{\sigma}}(\underline{u}) = \underset{\alpha}{\operatorname{argmin}} g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
+    \item $\underline{\underline{\sigma}}(\underline{u}) = \underset{\alpha}{\operatorname{argmin}} \, g(\underline{\underline{\varepsilon}}(\underline{u}),  \alpha)$,
     \item examples of $\uusigma(\uu)$ in the previously described plasticity model.
   \end{itemize}
 
