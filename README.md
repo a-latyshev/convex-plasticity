@@ -1,25 +1,27 @@
 # Convex-plasticity
 
-The main goal of the project is to propose an efficient and generic implementation which can tackle both classical and softening plasticity models. The implementation will be then extended to the resolution of the local plasticity problem using convex optimization solvers and assess its efficiency compared to standard return mapping algorithms. Finally, softening plasticity will be considered and regularization strategies in order to prevent mesh dependency will be explored. The implementation is based on the next generation FEniCS problem solving environment.
+The project aims at exploring a finite-element formulation of plasticity in the next generation [FEniCSx](https://fenicsproject.org/) problem-solving environment. The main goal is to propose an efficient and generic implementation, which can tackle plasticity models with hardening taking into account non-smooth yield criteria. In order to achieve this goal “classical plasticity”, “convex plasticity” and “custom assembly” approaches have been used and further developed. They are focused on the implementation of plasticity modelling with the help of FEniCSx, the application of convex optimization in the context of plasticity theory and the use of the concept of just-in-time (JIT) compilation.
 
+The repository contains a framework in Python that aims to solve plasticity problems in the FEniCSx environment. In this framework, two common approaches of modelling plasticity are implemented. The first one is called “classical plasticity” to pay tribute to [the original implementation](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html) of solving plasticity problems using a common return-mapping algorithm. The classical approach is well-suited for smooth yield criteria such as the von Mises and Drucker-Prager yield criteria. The second one is called “convex plasticity” because of the application of convex optimization in the context of plasticity problem-solving. The convex plasticity approach works for a wide range of yield criteria including non-smooth ones, for example for the Rankine yield criterion. Application of this approach makes the code more generic. 
+ 
+The framework draws attention to efficiency of numerical calculations in the context of writing scientific code in Python. In order to increase code performance, the concept of just-in-time compilation is applied. The project proposes an approach according to which the most critical parts of the assembly process of finite-element modelling are replaced by more performant JIT code. This approach is called “custom assembly” and inspired by the authors of [DOLFINx](https://github.com/FEniCS/dolfinx/blob/main/python/test/unit/fem/test_custom_assembler.py). 
 
-The project aims at exploring a finite-element formulation of plasticity in the next generation FEniCSx problem solving environment. The main goal is to propose an efficient and generic implementation which can tackle hardening plasticity models taking into account non-smooth yield criteria. The latter is achieved through the use of convex optimization in the context of plasticity theory.
-
-The repository contains a framework in Python which aims to solve plasticity problems in the FEniCSx environment. The implementation finds the solution of the local plasticity problem using convex optimization solvers. In this framework, both a common approach to modeling plasticity through the return-mapping algorithm and using conic optimization can be found. The latter works for a wide range of yield criteria while the classical approach is well-suited for smooth yield surface such as the von Mises and Drucker-Prager surfaces, but it's more difficult to manage for non-smooth ones such as, for instance, the Rankine yield surface. The research was performed under the assumptions of plane strain, an associative plasticity law and a linear isotropic hardening. Several numerical tests were carried out for different conic solvers where the effect of the size of the vectorized conic optimization problem was analyzed. In addition, the idea of custom assembly was developed to change the assembly process of the FEniCSx library easily. It is based on the concept of just-in-time compilation, which allows us to improve the time performance of some parts of the framework.
+This repository proposes implementations of three approaches to modelling plasticity: “classical plasticity”, “convex plasticity” and “custom assembly”. The first two show how to solve plasticity problems via the FEniCSx environment by implementing a return-mapping algorithm and how to extend such an implementation to a wider range of plasticity models using convex optimisation theory. The third approach aims at demonstrating how the efficiency of plasticity modelling via FEniCSx can be improved by applying JIT compilation and changing the assembly procedure. 
 
 Keywords: plasticity, isotropic hardening, return-mapping algorithm, convex optimization, conic solver, FEniCS Project, cvxpy, python, just-in-time compilation.
 
 ## How to use
 
-The framework is conditionally divided into 2 parts: convex plasticity and custom assembling.
+We welcome you to get started from [tutorials folder](tutorials/), where you find descriptions of our ideas and code examples solving a plasticity problem using different approaches.
 
-We call the *convex plasticity* or the convex optimization approach the one where the return-mapping algorithm is implemented by solving the optimization problem. 
+In order to deeply understand theoretical aspects of this project, we recommend you to get familiarised with the [rapport](rapport/Andrey_Latyshev_rapport.pdf) in the [rapport folder](rapport/). You find there mathematical formulations of the elasto-plastic problem, description of numerical methods to solve it as well as numerical experiments testing the proposed approaches.
 
-The *custom assembling* part of the project means our own version of custom assembler, where we change the main loop of the assembling procedure via FEniCSx environnement.
+All sources of the framework are stored in the [src folder](src/). 
 
-We are welcome you to get started from [tutorials folder](tutorials/), where you find descriptions of our ideas and code examples solving a plasticity problem using different approaches.
+The [demo folder](demo/) contains different examples implementing a specific feature, which is used or can be useful in this framework.
 
-All sources of the framework are situated in the [src folder](src/). In other folders we test different approaches and analyse results. 
+Other folders are intended to develop, test and analyse new features of the framework. 
+ 
 
 ## Dependencies 
 
