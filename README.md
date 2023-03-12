@@ -26,5 +26,6 @@ All sources of the framework are situated in the [src folder](src/). In other fo
 Tested for 
 
 * dolfinx (v0.3.1.0)
+* ![dolfinx](https://badgen.net/badge/DOLFINx/0.3.1/blue)
 * cvxpy (v1.2.2)
 * numba (v0.56.4)
