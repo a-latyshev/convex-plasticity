@@ -21,10 +21,8 @@ We are welcome you to get started from [tutorials folder](tutorials/), where you
 
 All sources of the framework are situated in the [src folder](src/). In other folders we test different approaches and analyse results. 
 
-## Requirements
+## Dependencies 
 
-Tested for 
-
-* [![dolfinx](https://badgen.net/badge/DOLFINx/0.3.1/blue)](https://github.com/FEniCS/dolfinx)
-* [![cvxpy](https://badgen.net/badge/CVXPY/1.2.2/blue)](https://github.com/cvxpy/cvxpy)
-* [![numba](https://badgen.net/badge/numba/0.56.4/blue)](https://github.com/numba/numba)
+[![dolfinx](https://badgen.net/badge/DOLFINx/0.3.1/blue)](https://github.com/FEniCS/dolfinx)
+[![cvxpy](https://badgen.net/badge/CVXPY/1.2.2/blue)](https://github.com/cvxpy/cvxpy)
+[![numba](https://badgen.net/badge/numba/0.56.4/blue)](https://github.com/numba/numba)
