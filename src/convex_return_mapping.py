@@ -204,7 +204,7 @@ class ReturnMapping:
         S_sparsed = block_diag([S for _ in range(N)])
         delta_sig_vector = cp.reshape(delta_sig, (N*4))
 
-        elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed)
+        elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed, assume_PSD=True)
         # target_expression = 0.5*elastic_energy + 0.5*material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
         D = material.yield_criterion.H * np.eye(N)
         target_expression = 0.5*elastic_energy + 0.5*cp.quad_form(self.p - self.p_old, D)
@@ -223,7 +223,7 @@ class ReturnMapping:
         Args:
             **kwargs: additional solver attributes, such as tolerance, etc.
         """
-        self.opt_problem.solve(solver=self.solver, requires_grad=False, **kwargs)
+        self.opt_problem.solve(solver=self.solver, requires_grad=False, ignore_dpp=False, **kwargs)
         
     def solve_and_derivate(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.

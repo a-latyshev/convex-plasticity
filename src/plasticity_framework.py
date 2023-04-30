@@ -13,6 +13,7 @@ from typing import List, Union, Dict, Optional, Callable
 import time
 import logging
 LOG_INFO_STAR = logging.INFO + 5
+LOG_INFO_TIME_ONLY = LOG_INFO_STAR + 1
 
 SQRT2 = np.sqrt(2.)
 
@@ -366,6 +367,7 @@ class AbstractPlasticity():
         # xdmf.write_mesh(mesh)
 
         self.initialize_variables()
+        niters = 0
 
         start = time.time()
 
@@ -398,9 +400,10 @@ class AbstractPlasticity():
         # xdmf.close()
         # end = time.time()
         total_time = time.time() - start
-        self.logger.log(LOG_INFO_STAR, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {total_time:.2f} (s)\n')
+        self.logger.log(LOG_INFO_TIME_ONLY, f'rank#{MPI.COMM_WORLD.rank}: Iterations number of last loading step = {niters}')
+        self.logger.log(LOG_INFO_TIME_ONLY, f'rank#{MPI.COMM_WORLD.rank}: Time (total) = {total_time:.2f} (s)\n')
 
-        return self.points_on_proc, results, total_time, self.sig, self.p, self.u
+        return self.points_on_proc, results, total_time, self.sig, self.p, self.u, niters
 
 class vonMisesPlasticity(AbstractPlasticity):
     def __init__(
