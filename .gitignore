@@ -2,7 +2,6 @@
 *.xdmf
 *.html
 __pycache__/
-*.png
 **/_petsc_**
 *.aux
 *.fdb_latexmk
@@ -27,3 +26,6 @@ _*.*
 *.tdo
 assembling_strategies/mesh
 *.vrb
+
+*.png
+!geometry.png
