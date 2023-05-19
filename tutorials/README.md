@@ -1,3 +1,18 @@
-# Tutorials 
+# Tutorials - README
 
-Here you find 
+Here you can find several tutorials aiming at introducing main ideas of the convex plasticity project to new users. Tutorials are presented in a Jupyter notebook format, which makes understanding of the code easier. Each notebook is an interactive program, solving the plasticity problem via FEniCSx environment. Notebooks have different blocks of code and text. Some blocks represent steps of finite element modelling (from variables initialization and mesh reading to post-processing), while others give key information about particular parts of the program.  
+
+The project proposes different approaches to solve elastoplastic problems via FEniCSx environment: “classical plasticity”, “convex plasticity” and “custom assembly”. Each tutorial is associated with an implementation of one of these approaches. In order to simplify the understanding of the programs, implemented approaches were performed on the main example of two-dimensional expansion cylinder problem under assumptions of plane strain, an associative plasticity law and a linear isotropic hardening. Full description of this problem can be found [here](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html) or in the [report](../rapport/Andrey_Latyshev_rapport.pdf) of this project.
+
+We advise you to take a look at the report that sums up all the information about this project, as the tutorials do not contain comprehensive information about theoretical aspects of implemented approaches and fully detailed description of the main problem. You find there mathematical formulations of the elastoplastic problem, description of numerical methods as well as numerical experiments testing the proposed approaches.
+
+The main goal of these tutorials is to explain in the simplest way how to implement different approaches to solving plasticity problems via the FEniCSx environment. In order to analyse these approaches and to automize numerical testing, it is easier to generalise the code of tutorials using object-oriented programming. Such code is presented in source files of this repository. This code is more complex and it takes more time to understand it properly, that is why familiarising with tutorials is a good starting point to deeply understand the whole framework.
+
+As all tutorials are interconnected, it is strongly recommended to study them in the following order:
+
+1. [plasticity](./plasticity/) describes the “classical approach” that solves plasticity problems using FEniCSx library. We call this approach “classical” to pay tribute to the original implementation of solving plasticity problems using the return-mapping algorithm. This tutorial is based on a [legacy solution](https://comet-fenics.readthedocs.io/en/latest/demo/2D_plasticity/vonMises_plasticity.py.html) implemented via FEniCS 2019.
+2. [convex_plasticity](./convex_plasticity/) represents an approach, where the plasticity problem is solved using convex optimisation. This approach is able to solve plasticity problems for a wide range of yield criteria, even for non-smooth ones. The library cvxpy was used to solve convex optimization problems.
+3. [Custom assembling approach](./custom_assembling/) exploits a concept of just-in-time compilation accelerating python programs execution. The tutorial shows how this concept can be used in the assembly procedure of finite element modelling on the examples of equilibrium problems for elastic and elastoplastic materials. This part of the project was [inspired](https://github.com/FEniCS/dolfinx/blob/main/python/test/unit/fem/test_custom_assembler.py) by authors of Dolfinx. Such libraries as numba and cffi are used in order to implement this idea.
+4. TODO: projet results tutorial
+
+The mesh folder contains finite element meshes in the Gmsh’s native .msh format (version 4) required for tutorials as well as a .geo file building the geometry of the domain. You can use the .geo file to generate your own FEM meshes. 
