@@ -2,7 +2,7 @@
 
 Here you find code analysing an impact of a dimension of a conic optimisation problem on compilation time via the cvxpy library. The compilation time is spent on a transformation of an original problem into its canonic form that is required for the majority of modern conic solvers. This benchmark shows that the compilation time drastically increases for high-dimension conic optimisation problems (more than 2000 variables). The main goal of the presented here script is to provide the cvxpy community with a stress test example that could help to accelerate the compilation of high-dimension conic optimisation problems.
 
-Disclaimer: Github’s markdown may not render properly LaTeX equations of this readme, so, please, download the README and render it locally on your machine.
+Disclaimer: Github’s markdown may not render properly LaTeX equations of this readme, so, please, download the README file and render it locally on your machine.
 
 ## In brief
 
@@ -69,8 +69,12 @@ $$
     p = p^\text{elas}_{n+1}.
 $$
 
+Values of a numerical solution of the elastoplasticity problem solved by the finite element method are known in nodes of a finite element mesh. The described above conic optimisation problem has to be solved at these nodes. As all the scalar conic problems are independent, it is possible to collect them into one vectorized conic problem. The formulation of the vectorized conic optimisation problem was given in the “In brief” section of this tutorial.
 
-Values of a numerical solution of the elastoplasticity problem solved by the finite element method are known in nodes of a finite element mesh. The described above conic optimisation problem can be solved at these nodes independently, so vectorization of the scalar problem is possible. The vectorized conic optimisation problem is formulated in the following way:
+In order to provide the community with the simplest example of solving a vectorized conic optimisation problem via the cvxpy library, direct FEM calculations are avoided. Instead, precalculated values of the parameter vector $deps$ are provided in the form of a NumPy array. This data is used to initialize the parameters of the conic optimisation problem.
+
+The benchmark implements only one solution of the conic optimisation problem, whereas the convex plasticity approach implies solving the original problem several times, for several iterations, with different values of parameters of the problem. At this stage, it is enough to analyse the canonicalization of the convex optimisation problem via cvxpy, as the compilation occurs in the very first iteration of the approach. 
+
 
 <!-- 
 $$
