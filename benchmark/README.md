@@ -1,19 +1,22 @@
 # Benchmark for compilation high-dimensional convex problems via cvxpy
 
-Here you find code analysing an impact of a dimension of a conic optimisation problem on compilation time via the cvxpy library. The compilation time is spent on a transformation of an original problem into its canonic form that is required for the majority of modern conic solvers. This benchmark shows that the compilation time drastically increases for high-dimension conic optimisation problems (more than 2000 variables). The main goal of the presented here script is to provide the cvxpy community with a stress test example that could help to accelerate the compilation of high-dimension conic optimisation problems.
+*Disclaimer: Github’s markdown may not render properly LaTeX equations of this readme, so, please, take a look at its ```.pdf``` version. Otherwise, we advise you to download the ```.md``` file and render it locally on your machine.*
 
-Disclaimer: Github’s markdown may not render properly LaTeX equations of this readme, so, please, download the README file and render it locally on your machine.
+Here you find code analysing an impact of a dimension of a conic optimisation problem on compilation time via the cvxpy library. The compilation time is spent on a transformation of an original problem into its canonic form that is required for the majority of modern conic solvers. This benchmark shows that the compilation time drastically increases for high-dimension conic optimisation problems (more than 2000 variables). The main goal of the presented here script is to provide the cvxpy community with a stress test example that could help to accelerate the compilation of high-dimension conic optimisation problems.
 
 ## In brief
 
 The vectorized conic optimisation problem is formulated in the following way
 
 $$
-    \min_{\mathbf{\Sigma}, \mathbf{P}} F(\mathbf{\Sigma}, \mathbf{P}), \\
+    \min_{\mathbf{\Sigma}, \mathbf{P}} F(\mathbf{\Sigma}, \mathbf{P}),
+$$
+$$
     f (\mathbf{\Sigma}, \mathbf{P}) \leq 0,
 $$
 
-where $F$ is an objective function, the vectors $\mathbf{\Sigma}$ and $\mathbf{P} \geq 0$ have the size of 4 ∗ N and N elements respectively and represent main variables of the problem, where N is a certain integer parameter, on which a dimension of the problem is dependent. The elementwise function $f$ represents a conic semi-definitive constrain that takes 4 components of the vector $\mathbf{\Sigma}$ and 1 component of the vector $\mathbf{P}$. Let us denote, for example, the first 4 components of the vector $\mathbf{\Sigma}$ and the first component of the vector $\mathbf{P}$ as $\boldsymbol{\sigma}$ and $p$ respectively. The expression of the function $f$ is following
+
+where $F$ is an objective function, the vectors $\mathbf{\Sigma}$ and $\mathbf{P} \geq 0$ have the size of 4N and N elements respectively and represent main variables of the problem, where N is a certain integer parameter, on which a dimension of the problem is dependent. The elementwise function $f$ represents a conic semi-definitive constrain that takes 4 components of the vector $\mathbf{\Sigma}$ and 1 component of the vector $\mathbf{P}$. Let us denote, for example, the first 4 components of the vector $\mathbf{\Sigma}$ and the first component of the vector $\mathbf{P}$ as $\boldsymbol{\sigma}$ and $p$ respectively. The expression of the function $f$ is following
 
 $$
     f(\boldsymbol{\sigma}, p) = \sqrt{\frac{3}{2}\mathbf{s}^T\mathbf{s}} - \sigma_0 - pH,
@@ -40,7 +43,9 @@ The benchmark is based on the idea of solving an equilibrium problem of an elast
 The original scalar conic optimisation problem can be formulated as follows:
 
 $$ 
-    \min_{\boldsymbol{\sigma}, p} F(\boldsymbol{\sigma}, p), \\
+    \min_{\boldsymbol{\sigma}, p} F(\boldsymbol{\sigma}, p),
+$$
+$$
     f(\boldsymbol{\sigma}, p) \leq 0,
 $$
 
@@ -65,7 +70,9 @@ where $\boldsymbol{\sigma}^\text{elas}_{n+1}  = \boldsymbol{\sigma}_{n}  + \math
 In this benchmark, the solution of the conic optimisation problem is trivial and can be written as follows:
 
 $$
-    \boldsymbol{\sigma} = \boldsymbol{\sigma}^\text{elas}_{n+1}, \\
+    \boldsymbol{\sigma} = \boldsymbol{\sigma}^\text{elas}_{n+1},
+$$
+$$
     p = p^\text{elas}_{n+1}.
 $$
 
@@ -73,34 +80,4 @@ Values of a numerical solution of the elastoplasticity problem solved by the fin
 
 In order to provide the community with the simplest example of solving a vectorized conic optimisation problem via the cvxpy library, direct FEM calculations are avoided. Instead, precalculated values of the parameter vector $deps$ are provided in the form of a NumPy array. This data is used to initialize the parameters of the conic optimisation problem.
 
-The benchmark implements only one solution of the conic optimisation problem, whereas the convex plasticity approach implies solving the original problem several times, for several iterations, with different values of parameters of the problem. At this stage, it is enough to analyse the canonicalization of the convex optimisation problem via cvxpy, as the compilation occurs in the very first iteration of the approach. 
-
-
-<!-- 
-$$
-    F(\mathbf{\Sigma}, \mathbf{P}) = \frac{1}{2}(\mathbf{\Sigma}^\text{elas}_{n+1} - \mathbf{\Sigma})^T\mathbb{S}(\mathbf{\Sigma}^\text{elas}_{n+1} - \mathbf{\Sigma}) + \frac{1}{2}H(\mathbf{P}^\text{elas}_{n+1} - \mathbf{P})^T(\mathbf{P}^\text{elas}_{n+1} - \mathbf{P})
-$$
-
-$$
-    \mathbb{S} = 
-    \begin{pmatrix}
-        \mathbf{S} &  & \\
-         & \ddots & \\
-         & & \mathbf{S}\\
-    \end{pmatrix}
-$$
-
-$$
-    \mathbf{DEV} \cdot \boldsymbol{\Sigma} = \mathbf{DEV} \cdot
-    \begin{pmatrix}
-         | &  & | \\
-         \boldsymbol{\sigma}_1& \dots & \boldsymbol{\sigma}_N \\
-         | & & | \\
-    \end{pmatrix}
-    = 
-    \begin{pmatrix}
-         | &  & | \\
-         \boldsymbol{s}_1& \dots & \boldsymbol{s}_N \\
-         | & & | \\
-    \end{pmatrix}
-$$ -->
+The benchmark implements only one solution of the conic optimisation problem, whereas the convex plasticity approach implies solving the original problem several times, for several iterations, with different values of parameters of the problem. At this stage, it is enough to analyse the canonicalization of the convex optimisation problem via cvxpy, as the compilation occurs in the very first iteration of the approach.  
