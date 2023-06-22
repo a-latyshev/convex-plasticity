@@ -2,6 +2,8 @@
 
 ## Context
 
+*Disclaimer: Github’s markdown may not render properly LaTeX equations of this readme, so, please, take a look at its ```.pdf``` version. Otherwise, we advise you to download the ```.md``` file and render it locally on your machine.*
+
 We consider the following typical non-linear problem in our study:
 
 Find $\underline{u} \in V$, such that
