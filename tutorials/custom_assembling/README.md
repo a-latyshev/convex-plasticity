@@ -40,7 +40,7 @@ We would like to introduce a concept of `CustomFunction` (for lack of a better n
 
 $$ \int_\Omega g \cdot uv dx, \quad \forall \underline{v} \in V, $$
 
-where $\underline{u}$ is a trial function, $\underline{v}$ is a test function and the function $g $ is an expression. For this moment we must use `fem.Function` class to implement this variational form. Knowing the exact UFL expression of $g $ we can calculate its values on every element using the interpolation procedure of `fem.Expression` class. So we save all values of $g $ in one global vector. The goal is to have a possibility to calculate $g $ expression, no matter how difficult it is, in every element node (for instance, in every gauss point, if we define $g $ on a quadrature element) during the assembling procedure. 
+where $\underline{u}$ is a trial function, $\underline{v}$ is a test function and the function $g$ is an expression. For this moment we must use `fem.Function` class to implement this variational form. Knowing the exact UFL expression of $g$ we can calculate its values on every element using the interpolation procedure of `fem.Expression` class. So we save all values of $g$ in one global vector. The goal is to have a possibility to calculate $g$ expression, no matter how difficult it is, in every element node (for instance, in every gauss point, if we define $g$ on a quadrature element) during the assembling procedure. 
 
 We introduce a new entity named as `CustomFunction` (or `CustomExpression`). It
 1. inherits `fem.Function`
@@ -48,7 +48,7 @@ We introduce a new entity named as `CustomFunction` (or `CustomExpression`). It
 
 ## DummyFunction 
 
-Besides `CustomFunction` we need an other entity. Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. Let us consider the previous variational form, where $g $ contains its local-element values now. If there is one local value of $g $ (only 1 gauss point), $g $ will be  `fem.Constant`, but we need to store different values of $g $ in every element node (gauss point). So we introduce a concept of `DummyFunction` (or `ElementaryFunction`?), which 
+Besides `CustomFunction` we need an other entity. Every `fem.Function` object stores its values globally, but we would like to avoid such a waste of memory updating the function value during the assembling procedure. Let us consider the previous variational form, where $g$ contains its local-element values now. If there is one local value of $g$ (only 1 gauss point), $g$ will be  `fem.Constant`, but we need to store different values of $g$ in every element node (gauss point). So we introduce a concept of `DummyFunction` (or `ElementaryFunction`?), which 
 1. inherits `fem.Function`
 2. allocates the memory for local values only
 3. can be updated during assembling procedure
