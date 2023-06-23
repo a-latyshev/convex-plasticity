@@ -8,7 +8,7 @@ We consider the following typical non-linear problem in our study:
 
 Find $\underline{u} \in V$, such that
 
-$$ F(\underline{u}) = \int_\Omega \underline{\underline{\sigma}}(\underline{u}) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{f} \underline{v} dx = 0 \quad \forall \underline{v} \in V,$$
+$$F(\underline{u}) = \int_\Omega \underline{\underline{\sigma}}(\underline{u}) : \underline{\underline{\varepsilon}}(\underline{v}) dx - \int_\Omega \underline{f} \underline{v} dx = 0 \quad \forall \underline{v} \in V,$$
 where an expression of $\underline{\underline{\sigma}}(\underline{u})$ is non linear and cannot be defined via UFL. Let us show you some examples
 
 - $\underline{\underline{\sigma}}(\underline{u}) = f(\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III})$,
@@ -18,7 +18,7 @@ where $\varepsilon_\text{I}, \varepsilon_\text{II}, \varepsilon_\text{III}$ are 
 
 As seen in the second example, $\underline{\underline{\sigma}}(\underline{u})$ can also implicitly depend on the value of other scalar, vector or even tensorial quantities, $\alpha$ here. The latter do not necessarily need to be represented in a finite-element function space. They shall just be computed during the assembling procedure when evaluating the expression $\underline{\underline{\sigma}}(\underline{u})$ pointwise.
 
-In addition, in order to use a standard Newton method to find the solution of $F(\underline{u})=0 $, we also need to compute the derivative of $\underline{\underline{\sigma}}$ with respect to $\underline{u}$. The latter may also depend on some internal variables $\alpha$ of $\underline{\underline{\sigma}}$. Thus, it is necessary to have a fonctionality which will allow to do a simultaneous calculation of $\underline{\underline{\sigma}}$ and its derivative during assembling procedure.
+In addition, in order to use a standard Newton method to find the solution of $F(\underline{u})=0$, we also need to compute the derivative of $\underline{\underline{\sigma}}$ with respect to $\underline{u}$. The latter may also depend on some internal variables $\alpha$ of $\underline{\underline{\sigma}}$. Thus, it is necessary to have a fonctionality which will allow to do a simultaneous calculation of $\underline{\underline{\sigma}}$ and its derivative during assembling procedure.
 D
 In practice, in the previous examples $\underline{\underline{\sigma}}$ depends directly on $\underline{\underline{\varepsilon}} = \frac{1}{2}(\nabla \underline{u} + \nabla \underline{u}^T)$. As a result, it is more natural to consider the non-linear expression as a function of $\underline{\underline{\varepsilon}}$ directly, provide an expression for $\dfrac{d\underline{\underline{\sigma}}}{d\underline{\underline{\varepsilon}}}$ and evaluate $\dfrac{d\underline{\underline{\sigma}}}{d\underline{u}}$ by the chain rule (letting UFL handle the $\dfrac{d\underline{\underline{\varepsilon}}}{d\underline{u}}$ part).
 
@@ -66,7 +66,7 @@ $$\int_\Omega \underline{\underline{\sigma}}(\underline{\underline{\varepsilon}}
 $$ \partial\Omega_\text{left} : u_x = 0, $$
 $$ (0, 0) : u_y = 0, $$
 $$ \partial\Omega_\text{right} : u_x = t \cdot u_\text{bc},$$
-where $u_\text{bc}$ is a maximal displacement on the right side of the beam, $t $ is a parameter varying from 0 to 1, and where $\underline{\underline{\sigma}}(\underline{\underline{\varepsilon}})$ is our user-defined "oracle". Here we use a simple elastic behaviour:
+where $u_\text{bc}$ is a maximal displacement on the right side of the beam, $t$ is a parameter varying from 0 to 1, and where $\underline{\underline{\sigma}}(\underline{\underline{\varepsilon}})$ is our user-defined "oracle". Here we use a simple elastic behaviour:
 
 $$
 \underline{\underline{\sigma}}(\underline{\underline{\varepsilon}}) = \mathbf{C}:\underline{\underline{\varepsilon}}
@@ -128,7 +128,7 @@ $$\underline{\underline{\sigma_\text{elas}}} = \underline{\underline{\sigma}}_n 
 
 $$\underline{\underline{s}} = \mathsf{dev} \, \underline{\underline{\sigma_\text{elas}}}$$
 
-$$ f_\text{elas} = \sigma^\text{eq}_\text{elas} - \sigma_0 - H p_n $$  
+$$f_\text{elas} = \sigma^\text{eq}_\text{elas} - \sigma_0 - H p_n $$  
 
 $$\Delta p = \frac{< f_\text{elas} >_+}{3\mu + H},$$
 
