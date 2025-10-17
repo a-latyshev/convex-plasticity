@@ -43,6 +43,51 @@ from dolfinx_external_operator import (
     replace_external_operators,
 )
 
+import pickle
+from datetime import datetime
+import os, psutil
+from dolfinx import common
+
+import sys
+sys.path.append("./")
+from cvxpygen import cpg
+
+# %%
+import argparse
+import sys
+
+parser = argparse.ArgumentParser(
+    description="Set runtime parameters for this notebook (uses parse_known_args to work in Jupyter)."
+)
+parser.add_argument("--patch-size", type=int, default=3, help="number of quadratures per patch")
+parser.add_argument("--patch-size-max", type=bool, default=False, help="if True take max patch size")
+parser.add_argument("--solver", type=str, default="CLARABEL", help="convex solver name (e.g. CLARABEL, MOSEK)")
+parser.add_argument("--compiled", type=bool, default=False, help="whether to use cvxpygen")
+parser.add_argument("--h", type=float, default=0.3, help="mesh size parameter")
+# # In Jupyter kernels there are extra argv entries, so use parse_known_args
+args, _ = parser.parse_known_args()
+
+def _set_if_provided(name, value):
+    if value is None:
+        return
+    globals()[name] = value
+
+_set_if_provided("patch_size", args.patch_size)
+_set_if_provided("patch_size_max", args.patch_size_max)
+_set_if_provided("solver_name", args.solver)  
+_set_if_provided("compiled", args.compiled)
+_set_if_provided("h", args.h)
+
+# # If scs_params exists and tol provided, update it
+# if "scs_params" in globals() and args.tol is not None:
+#     scs_params.update({"eps": args.tol, "eps_abs": args.tol, "eps_rel": args.tol})
+
+# # Summary
+# print("Applied runtime parameters:")
+# for n in ("patch_size", "solver_name", "tol", "num_increments", "k_u", "k_stress"):
+#     if n in globals():
+#         print(f"  {n}: {globals()[n]}")
+
 # %% [markdown]
 # Here we define geometrical and material parameters of the problem as well as some useful constants.
 
@@ -73,7 +118,7 @@ deviatoric = np.eye(4, dtype=PETSc.ScalarType)
 deviatoric[:3, :3] -= np.full((3, 3), 1.0 / 3.0, dtype=PETSc.ScalarType)
 
 # %%
-mesh, facet_tags, facet_tags_labels = build_cylinder_quarter()
+mesh, facet_tags, facet_tags_labels = build_cylinder_quarter(lc=h)
 
 # %%
 k_u = 2
@@ -334,11 +379,27 @@ rankine = Rankine(sigt, sigc, H)
 von_mises = vonMises(sigma_0, H)
 material = Material(IsotropicElasticity(E, nu), von_mises)
 
-patch_size = 3
-return_mapping = ConvexPlasticity(material, patch_size, 'CLARABEL')
+if patch_size_max:
+    patch_size = P.dofmap.index_map.size_local
+return_mapping = ConvexPlasticity(material, patch_size, solver_name)
 tol = 1.0e-13
 scs_params = {'eps': tol, 'eps_abs': tol, 'eps_rel': tol}
 conic_solver_params = {}
+
+# %%
+if compiled:
+    code_dir = 'code_dir'
+    # # code_dir = '/mnt/external_operators/code/dolfinx-external-operator/demo/code_dir2'
+    sys.path.append(code_dir)
+    cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, gradient=False)
+
+    from code_dir.cpg_solver import cpg_solve
+    return_mapping.opt_problem.register_solve('CPG', cpg_solve)
+    solver_name = 'CPG'
+
+# %%
+if MPI.COMM_WORLD.rank == 0:
+    print(f"n_quadratures_local: {P.dofmap.index_map.size_local} n_quadratures_global: {P.dofmap.index_map.size_global} n_processes: {MPI.COMM_WORLD.size} mesh_size: {h} compiled: {compiled} solver: {args.solver} patch_size: {patch_size}", flush=True)
 
 # %% [markdown]
 # Now nothing stops us from defining the implementation of the external operator
@@ -352,37 +413,46 @@ sigma_n.x.array[:] = 0.0
 p_n.x.array[:] = 0.0
 
 # %%
+# N_patches
+
+# %%
+# residue_size
+
+# %%
+# sigma.ref_coefficient.x.array[:4*(num_quadrature_points - residue_size)].shape
+
+# %%
+# sigma.ref_coefficient.x.array[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4)).shape
+# sigma.ref_coefficient.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4)).shape
+
+
+# %%
 num_quadrature_points = int(sigma_n.x.array.size / stress_dim)
 
-# deps_ = deps.reshape((num_cells, num_quadrature_points, 4))
-# sigma_n_ = sigma_n.x.array.reshape((num_cells, num_quadrature_points, 4))
-# p_ = p.x.array.reshape((num_cells, num_quadrature_points))
-
-# _, sigma_, dp_ = return_mapping(deps_, sigma_n_, p_)
 N_patches = int(num_quadrature_points / patch_size)
 residue_size = num_quadrature_points % patch_size
 p_vals = np.empty_like(p.x.array)
 # p_values = p.x.array[:num_quadrature_points - residue_size].reshape((-1, patch_size))
 p_values = p_vals[:num_quadrature_points - residue_size].reshape((-1, patch_size))
 p_old_values = p_n.x.array[:num_quadrature_points - residue_size].reshape((-1, patch_size))
-# deps_values = deps.x.array[:4*(num_quadrature_points -
-# residue_size)].reshape((-1, patch_size, 4))
 
 sigma_vals = np.empty_like(sigma.ref_coefficient.x.array)
 sig_values = sigma_vals[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4))
 sig_old_values = sigma_n.x.array[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4))
 
 if residue_size != 0:
-    return_mapping_residue = ConvexPlasticity(material, residue_size, 'CLARABEL')
+    return_mapping_residue = ConvexPlasticity(material, residue_size, solver_name)
     # p_values_residue = p.x.array[num_quadrature_points - residue_size:].reshape((1, residue_size))
     p_values_residue = p_vals[num_quadrature_points - residue_size:].reshape((1, residue_size))
     p_old_values_residue = p_n.x.array[num_quadrature_points - residue_size:].reshape((1, residue_size))
-    deps_values_residue = deps.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
+    # deps_values_residue  = deps.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
     sig_values_residue = sigma_vals[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
     sig_old_values_residue = sigma_n.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
 
 def sigma_impl(deps):
-    deps_values = deps[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4))
+    deps_ = deps.reshape(-1)
+    # print(deps_[:4*(num_quadrature_points - residue_size)].shape)
+    deps_values = deps_[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4))
     # if residue_size != 0:
         # sig_values_residue = sig.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
         # sig_old_values_residue = sig_old.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
@@ -398,7 +468,7 @@ def sigma_impl(deps):
         p_values[q,:] = return_mapping.p.value
 
     if residue_size != 0: #how to improve ?
-        deps_values_residue = deps[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
+        deps_values_residue = deps_[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
         return_mapping_residue.deps.value[:] = deps_values_residue[0,:].T
         return_mapping_residue.sig_old.value[:] = sig_old_values_residue[0,:].T
         return_mapping_residue.p_old.value = p_old_values_residue[0,:]
@@ -445,15 +515,6 @@ def sigma_external(derivatives):
 sigma.external_function = sigma_external
 
 # %% [markdown]
-# ```{note}
-# The framework allows implementations of external operators and its derivatives
-# to return additional outputs. In our example, alongside with the values of the
-# derivative, the function `C_tang_impl` returns, the values of the stress tensor
-# and the cumulative plastic increment. Both additional outputs may be reused by
-# the user afterwards in the Newton loop.
-# ```
-
-# %% [markdown]
 # ### Form manipulations
 #
 # As in the previous tutorials before solving the problem we need to perform
@@ -469,17 +530,6 @@ J_replaced, J_external_operators = replace_external_operators(J_expanded)
 
 F_form = fem.form(F_replaced)
 J_form = fem.form(J_replaced)
-
-# %% [markdown]
-# ```{note}
-#  We remind that in the code above we replace `FEMExternalOperator` objects by
-#  their `fem.Function` representatives, the coefficients which are allocated
-#  during the call of the `FEMExternalOperator` constructor. The access to these
-#  coefficients may be carried out through the field `ref_coefficient` of an
-#  `FEMExternalOperator` object. For example, the following code returns the
-#  finite coefficient associated with the tangent matrix
-#  `C_tang = J_external_operators[0].ref_coefficient`.
-# ```
 
 # %% [markdown]
 # ### Solving the problem
@@ -515,9 +565,8 @@ petsc_options = {
     "snes_atol": 1.0e-8,
     "snes_rtol": 1.0e-8,
     "snes_max_it": 100,
-    "snes_monitor": "",
+    # "snes_monitor": "",
 }
-
 
 solver = PETScNonlinearSolver(mesh.comm, problem, petsc_options=petsc_options)  # PETSc.SNES wrapper
 
@@ -525,6 +574,9 @@ solver = PETScNonlinearSolver(mesh.comm, problem, petsc_options=petsc_options)  
 # Now we are ready to solve the problem.
 
 # %%
+timer = common.Timer("DOLFINx_timer")
+timer.start()
+
 u = fem.Function(V, name="displacement")
 
 x_point = np.array([[R_i, 0, 0]])
@@ -557,6 +609,38 @@ for i, loading_v in enumerate(loadings):
 
     if len(points_on_process) > 0:
         results[i, :] = (u.eval(points_on_process, cells)[0], loading.value / q_lim)
+
+timer.stop()
+total_time = timer.elapsed().total_seconds()
+def get_memory_usage():
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    return mem_info.rss  # in bytes
+memory_usage = MPI.COMM_WORLD.allreduce(get_memory_usage() / (2 ** 30), op=MPI.SUM)
+
+# %%
+if MPI.COMM_WORLD.rank == 0:
+    n_processes = MPI.COMM_WORLD.size
+    output_data = {
+        "total_time": total_time, 
+        "solver": args.solver, 
+        "patch_size": patch_size,
+        "memory_usage": memory_usage,
+        "n_quadratures_local": P.dofmap.index_map.size_local,
+        "n_quadratures_global": P.dofmap.index_map.size_global,
+        "n_processes": n_processes,
+        "mesh_size": h,
+        "compiled": compiled,
+        "date": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+    }
+    os.makedirs("./output", exist_ok=True)
+    filename = (
+        f"output_-{output_data['solver']}_-{output_data['patch_size']}_-{n_processes}_{h}_{compiled}.pkl"
+    )
+    output_data["output_file"] = os.path.join("./output", filename)
+    print(output_data)
+    with open(output_data["output_file"], "wb") as f:
+        f.write(pickle.dumps(output_data))
 
 # %% [markdown]
 # ### Post-processing

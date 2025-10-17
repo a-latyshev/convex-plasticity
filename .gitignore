@@ -29,3 +29,4 @@ assembling_strategies/mesh
 
 *.png
 !geometry.png
+*.pkl
