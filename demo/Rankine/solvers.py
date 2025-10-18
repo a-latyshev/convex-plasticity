@@ -25,7 +25,7 @@ class LinearProblem:
         self.dR = dR
         self.b_form = fem.form(R)
         self.A_form = fem.form(dR)
-        self.b = fem.petsc.create_vector(self.b_form)
+        self.b = fem.petsc.create_vector(V)
         self.A = fem.petsc.create_matrix(self.A_form)
 
         self.comm = domain.comm
@@ -185,7 +185,8 @@ class PETScNonlinearSolver:
         petsc_options: Optional[dict] = {},
         prefix: Optional[str] = None,
     ):
-        self.b = fem.petsc.create_vector(problem.F_form)
+        V = problem.u.function_space
+        self.b = fem.petsc.create_vector(V)
         self.A = fem.petsc.create_matrix(problem.J_form)
 
         # Give PETSc solver options a unique prefix

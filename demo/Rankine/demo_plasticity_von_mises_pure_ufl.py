@@ -148,8 +148,8 @@ def plasticity_von_mises_pure_ufl(verbose=True):
         nRes0 = von_mises_problem.b.norm()
         nRes = nRes0
 
-        if MPI.COMM_WORLD.rank == 0 and verbose:
-            print(f"\nIncrement#{i + 1!s}: load = {t * q_lim:.3f}, Residual0 = {nRes0:.2e}")
+        # if MPI.COMM_WORLD.rank == 0 and verbose:
+        #     print(f"\nIncrement#{i + 1!s}: load = {t * q_lim:.3f}, Residual0 = {nRes0:.2e}")
         niter = 0
 
         while nRes / nRes0 > tol and niter < Nitermax:
@@ -163,8 +163,8 @@ def plasticity_von_mises_pure_ufl(verbose=True):
 
             nRes = von_mises_problem.b.norm()
 
-            if MPI.COMM_WORLD.rank == 0 and verbose:
-                print(f"\tit#{niter} Residual: {nRes:.2e}")
+            # if MPI.COMM_WORLD.rank == 0 and verbose:
+            #     print(f"\tit#{niter} Residual: {nRes:.2e}")
             niter += 1
 
         # Update main variables

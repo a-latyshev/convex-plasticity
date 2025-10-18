@@ -9,7 +9,7 @@ import basix
 # import dolfinx.plot as plot
 from dolfinx.fem import Expression, Function
 from dolfinx.geometry import bb_tree, compute_colliding_cells, compute_collisions_points
-from dolfinx.io import gmshio
+from dolfinx.io import gmsh as gmshio
 
 
 def build_cylinder_quarter(lc=0.3, R_e=1.3, R_i=1.0):
