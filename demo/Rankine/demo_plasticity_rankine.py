@@ -30,6 +30,12 @@
 # apt install rustup
 # rustup update nightly
 # ```
+#
+# For cvxpylayers:
+#
+# ```shell
+# pip install jax==0.5.3
+# ```
 
 # %%
 from mpi4py import MPI
@@ -61,6 +67,9 @@ from dolfinx import common
 import sys
 sys.path.append("./")
 from cvxpygen import cpg
+
+import jax
+jax.config.update("jax_enable_x64", True)
 from cvxpylayers.jax import CvxpyLayer
 
 # %%
@@ -328,27 +337,21 @@ class ConvexPlasticity:
         self.p_old = cp.Parameter((N,), nonneg=True, name='p_old')
         self.p = cp.Variable((N,),nonneg=True, name='p')
 
+        self.sig_numpy = np.empty((4, N))
+        self.p_numpy = np.empty((N,))
+
         self.sig_old.value = np.zeros((4, N))
         self.deps.value = np.zeros((4, N))
         self.p_old.value = np.zeros((N,))
         self.C_tang = np.zeros((N, 4, 4))
 
         S = np.linalg.inv(material.C)
+        L = np.linalg.cholesky(np.linalg.inv(material.C))
         delta_sig = self.sig - sig_elas
-        # energy = []
-        # for i in range(N):
-        #     energy.append(cp.quad_form(delta_sig[:, i], S))
-        # target_expression = cp.sum(cp.hstack(energy)) + material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
-        
-        # energy = cp.sum(cp.diag(delta_sig.T @ S_sparsed @ delta_sig))
-        
-        S_sparsed = block_diag([S for _ in range(N)])
-        delta_sig_vector = cp.reshape(delta_sig, (N*4), order='C')
-
-        elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed, assume_PSD=True)
+        elastic_energy = cp.sum_squares(L @ delta_sig)
         # target_expression = 0.5*elastic_energy + 0.5*material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
         D = material.yield_criterion.H * np.eye(N)
-        target_expression = 0.5*elastic_energy + 0.5*cp.quad_form(self.p - self.p_old, D)
+        target_expression = 0.5 * elastic_energy + 0.5 * material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
 
         constrains = material.yield_criterion.criterion(self.sig, self.p) 
 
@@ -357,18 +360,24 @@ class ConvexPlasticity:
 
         self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
         self.solver = solver
+
+
+        self.sig.value[:] = 0.0
+        self.p.value[:] = 0.0
+        # TODO: Try differentiate with cvxpylayers
         # self.cvxpylayer = CvxpyLayer(self.opt_problem, parameters=[self.deps, self.sig_old, self.p_old], variables=[self.sig, self.p])
-    
+        # self.dxxcvxpylayer = jax.grad(lambda deps, sig_old, p_old: self.cvxpylayer(deps, sig_old, p_old)[0][0], argnums=[0])
+        # self.dyycvxpylayer = jax.grad(lambda deps, sig_old, p_old: self.cvxpylayer(deps, sig_old, p_old)[0][1], argnums=[0])
+        # self.dzzcvxpylayer = jax.grad(lambda deps, sig_old, p_old: self.cvxpylayer(deps, sig_old, p_old)[0][2], argnums=[0])
+        # self.dxycvxpylayer = jax.grad(lambda deps, sig_old, p_old: self.cvxpylayer(deps, sig_old, p_old)[0][3], argnums=[0])
+
     def solve(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
         
         Args:
             **kwargs: additional solver attributes, such as tolerance, etc.
         """
-        self.opt_problem.solve(solver=self.solver, requires_grad=False, ignore_dpp=False, **kwargs)
-        # solution = self.cvxpylayer(self.deps.value, self.sig_old.value, self.p_old.value)
-        # self.sig.value[:] = solution[0]
-        # self.p.value[:] = solution[1]
+        self.opt_problem.solve(solver=self.solver, requires_grad=False, ignore_dpp=False, warm_start=True, **kwargs)
         
     def solve_and_derivate(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
@@ -392,6 +401,19 @@ class ConvexPlasticity:
             
             self.differentiation_time = t.elapsed()[0] # time.time() - start
 
+    # def solve_and_derivate(self, **kwargs):
+    #     """Solves a minimization problem and calculates the derivative of `sig` variable.
+        
+    #     Args:
+    #         **kwargs: additional solver attributes, such as tolerance, etc.
+    #     """
+    #     # self.opt_problem.solve(solver=self.solver, requires_grad=False, ignore_dpp=False, **kwargs)
+    #     solution = self.cvxpylayer(self.deps.value, self.sig_old.value, self.p_old.value)
+    #     self.sig_numpy[:] = solution[0]
+    #     self.p_numpy[:] = solution[1]
+
+    #     result = self.dxxcvxpylayer(jax.numpy.array(self.deps.value), jax.numpy.array(self.sig_old.value), jax.numpy.array(self.p_old.value))
+    #     print(result)
 
 # %%
 rankine = Rankine(sigt, sigc, H)
@@ -413,8 +435,9 @@ if compiled:
         code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
         sys.path.append(code_dir)
         cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, prefix=f'{MPI.COMM_WORLD.rank}', gradient=False)
-    MPI.COMM_WORLD.barrier()
-
+        # TODO: Figure out when gradient=True will work
+    MPI.COMM_WORLD.barrier() # Wait until rank 0 has generated the code
+    
     from code_dir.cpg_solver import cpg_solve
     solver_name = f'CPG'
     return_mapping.opt_problem.register_solve(solver_name, cpg_solve)
@@ -490,6 +513,9 @@ def sigma_impl(deps):
         sig_values[q,:] = return_mapping.sig.value[:].T
         p_values[q,:] = return_mapping.p.value
 
+        # sig_values[q,:] = return_mapping.sig_numpy[:].T
+        # p_values[q,:] = return_mapping.p_numpy
+
     if residue_size != 0: #how to improve ?
         deps_values_residue = deps_[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
         return_mapping_residue.deps.value[:] = deps_values_residue[0,:].T
@@ -500,6 +526,10 @@ def sigma_impl(deps):
 
         sig_values_residue[0,:] = return_mapping_residue.sig.value[:].T
         p_values_residue[0,:] = return_mapping_residue.p.value
+
+        # sig_values[0,:] = return_mapping.sig_numpy[:].T
+        # p_values[0,:] = return_mapping.p_numpy
+        
     return sigma_vals.reshape(-1), p_vals.reshape(-1)
 
 global_size = int(sigma.ref_coefficient.x.array.size / 4.0)
