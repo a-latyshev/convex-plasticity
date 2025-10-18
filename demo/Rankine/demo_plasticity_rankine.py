@@ -51,6 +51,7 @@ from dolfinx import common
 import sys
 sys.path.append("./")
 from cvxpygen import cpg
+from cvxpylayers.jax import CvxpyLayer
 
 # %%
 import argparse
@@ -342,6 +343,7 @@ class ConvexPlasticity:
 
         self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
         self.solver = solver
+        # self.cvxpylayer = CvxpyLayer(self.opt_problem, parameters=[self.deps, self.sig_old, self.p_old], variables=[self.sig, self.p])
     
     def solve(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
@@ -350,6 +352,9 @@ class ConvexPlasticity:
             **kwargs: additional solver attributes, such as tolerance, etc.
         """
         self.opt_problem.solve(solver=self.solver, requires_grad=False, ignore_dpp=False, **kwargs)
+        # solution = self.cvxpylayer(self.deps.value, self.sig_old.value, self.p_old.value)
+        # self.sig.value[:] = solution[0]
+        # self.p.value[:] = solution[1]
         
     def solve_and_derivate(self, **kwargs):
         """Solves a minimization problem and calculates the derivative of `sig` variable.
@@ -380,22 +385,27 @@ von_mises = vonMises(sigma_0, H)
 material = Material(IsotropicElasticity(E, nu), von_mises)
 
 if patch_size_max:
-    patch_size = P.dofmap.index_map.size_local
+    patch_size = MPI.COMM_WORLD.allreduce(P.dofmap.index_map.size_local, op=MPI.MIN)
 return_mapping = ConvexPlasticity(material, patch_size, solver_name)
 tol = 1.0e-13
 scs_params = {'eps': tol, 'eps_abs': tol, 'eps_rel': tol}
 conic_solver_params = {}
 
 # %%
+timer = common.Timer("DOLFINx_timer")
 if compiled:
+    timer.start()
+    # if MPI.COMM_WORLD.rank == 0:
     code_dir = 'code_dir'
-    # # code_dir = '/mnt/external_operators/code/dolfinx-external-operator/demo/code_dir2'
     sys.path.append(code_dir)
     cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, gradient=False)
 
     from code_dir.cpg_solver import cpg_solve
     return_mapping.opt_problem.register_solve('CPG', cpg_solve)
     solver_name = 'CPG'
+    timer.stop()
+    # MPI.COMM_WORLD.barrier()
+    compilation_time = timer.elapsed().total_seconds()
 
 # %%
 if MPI.COMM_WORLD.rank == 0:
@@ -445,13 +455,11 @@ if residue_size != 0:
     # p_values_residue = p.x.array[num_quadrature_points - residue_size:].reshape((1, residue_size))
     p_values_residue = p_vals[num_quadrature_points - residue_size:].reshape((1, residue_size))
     p_old_values_residue = p_n.x.array[num_quadrature_points - residue_size:].reshape((1, residue_size))
-    # deps_values_residue  = deps.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
     sig_values_residue = sigma_vals[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
     sig_old_values_residue = sigma_n.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
 
 def sigma_impl(deps):
     deps_ = deps.reshape(-1)
-    # print(deps_[:4*(num_quadrature_points - residue_size)].shape)
     deps_values = deps_[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4))
     # if residue_size != 0:
         # sig_values_residue = sig.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4))
@@ -574,7 +582,6 @@ solver = PETScNonlinearSolver(mesh.comm, problem, petsc_options=petsc_options)  
 # Now we are ready to solve the problem.
 
 # %%
-timer = common.Timer("DOLFINx_timer")
 timer.start()
 
 u = fem.Function(V, name="displacement")
@@ -633,6 +640,8 @@ if MPI.COMM_WORLD.rank == 0:
         "compiled": compiled,
         "date": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
     }
+    if compiled:
+        output_data["compilation_time"] = compilation_time
     os.makedirs("./output", exist_ok=True)
     filename = (
         f"output_-{output_data['solver']}_-{output_data['patch_size']}_-{n_processes}_{h}_{compiled}.pkl"

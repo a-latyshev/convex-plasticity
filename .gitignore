@@ -21,7 +21,7 @@ __pycache__/
 **/_minted**
 *.so
 **/build
-**/code_dir
+**/code_dir**
 _*.*
 *.tdo
 assembling_strategies/mesh
@@ -30,3 +30,4 @@ assembling_strategies/mesh
 *.png
 !geometry.png
 *.pkl
+.DS_Store
