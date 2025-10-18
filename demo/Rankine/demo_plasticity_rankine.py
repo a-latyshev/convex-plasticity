@@ -15,11 +15,21 @@
 # ---
 
 # %% [markdown]
-# # Plasticity of von Mises
+# # Modern convex-plasticity benchmark
 #
-# ## Implementation
+# Requirements:
 #
-# ### Preamble
+# Auto-installations:
+#  - Julia
+#
+# To use CVXPYGEN and CLARABEL. LOG:
+# ```shell
+# apt install cargo
+# cargo install cbindgen --locked
+# export PATH="$PATH:/root/.cargo/bin"
+# apt install rustup
+# rustup update nightly
+# ```
 
 # %%
 from mpi4py import MPI
@@ -78,6 +88,10 @@ _set_if_provided("patch_size_max", args.patch_size_max)
 _set_if_provided("solver_name", args.solver)  
 _set_if_provided("compiled", args.compiled)
 _set_if_provided("h", args.h)
+
+from copy import deepcopy
+
+solver_name_residue = deepcopy(solver_name)
 
 # # If scs_params exists and tol provided, update it
 # if "scs_params" in globals() and args.tol is not None:
@@ -329,7 +343,7 @@ class ConvexPlasticity:
         # energy = cp.sum(cp.diag(delta_sig.T @ S_sparsed @ delta_sig))
         
         S_sparsed = block_diag([S for _ in range(N)])
-        delta_sig_vector = cp.reshape(delta_sig, (N*4))
+        delta_sig_vector = cp.reshape(delta_sig, (N*4), order='C')
 
         elastic_energy = cp.quad_form(delta_sig_vector, S_sparsed, assume_PSD=True)
         # target_expression = 0.5*elastic_energy + 0.5*material.yield_criterion.H * cp.sum_squares(self.p - self.p_old)
@@ -395,16 +409,17 @@ conic_solver_params = {}
 timer = common.Timer("DOLFINx_timer")
 if compiled:
     timer.start()
-    # if MPI.COMM_WORLD.rank == 0:
-    code_dir = 'code_dir'
-    sys.path.append(code_dir)
-    cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, gradient=False)
+    if MPI.COMM_WORLD.rank == 0:
+        code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
+        sys.path.append(code_dir)
+        cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, prefix=f'{MPI.COMM_WORLD.rank}', gradient=False)
+    MPI.COMM_WORLD.barrier()
 
     from code_dir.cpg_solver import cpg_solve
-    return_mapping.opt_problem.register_solve('CPG', cpg_solve)
-    solver_name = 'CPG'
+    solver_name = f'CPG'
+    return_mapping.opt_problem.register_solve(solver_name, cpg_solve)
+    
     timer.stop()
-    # MPI.COMM_WORLD.barrier()
     compilation_time = timer.elapsed().total_seconds()
 
 # %%
@@ -451,7 +466,7 @@ sig_values = sigma_vals[:4*(num_quadrature_points - residue_size)].reshape((-1, 
 sig_old_values = sigma_n.x.array[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4))
 
 if residue_size != 0:
-    return_mapping_residue = ConvexPlasticity(material, residue_size, solver_name)
+    return_mapping_residue = ConvexPlasticity(material, residue_size, solver_name_residue)
     # p_values_residue = p.x.array[num_quadrature_points - residue_size:].reshape((1, residue_size))
     p_values_residue = p_vals[num_quadrature_points - residue_size:].reshape((1, residue_size))
     p_old_values_residue = p_n.x.array[num_quadrature_points - residue_size:].reshape((1, residue_size))
@@ -599,13 +614,14 @@ eps = np.finfo(PETSc.ScalarType).eps
 
 for i, loading_v in enumerate(loadings):
     if MPI.COMM_WORLD.rank == 0:
-        print(f"Load increment #{i}, load: {loading_v:.3f}")
+        print(f"Load increment #{i}, load: {loading_v:.3f}", flush=True)
 
     loading.value = loading_v
     Du.x.array[:] = eps
 
     iters, _ = solver.solve(Du)
-    print(f"\tInner Newton iterations: {iters}")
+    if MPI.COMM_WORLD.rank == 0:
+        print(f"\tInner Newton iterations: {iters}", flush=True)
 
     u.x.petsc_vec.axpy(1.0, Du.x.petsc_vec)
     u.x.scatter_forward()
@@ -632,6 +648,7 @@ if MPI.COMM_WORLD.rank == 0:
         "total_time": total_time, 
         "solver": args.solver, 
         "patch_size": patch_size,
+        "patch_size_max": patch_size_max,
         "memory_usage": memory_usage,
         "n_quadratures_local": P.dofmap.index_map.size_local,
         "n_quadratures_global": P.dofmap.index_map.size_global,
