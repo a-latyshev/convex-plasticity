@@ -22,7 +22,7 @@
 # Auto-installations:
 #  - Julia
 #
-# To use CVXPYGEN and CLARABEL. LOG:
+# To use CVXPYGEN and CLARABEL, LOG:
 # ```shell
 # apt install cargo
 # cargo install cbindgen --locked
@@ -35,6 +35,10 @@
 #
 # ```shell
 # pip install jax==0.5.3
+# ```
+#
+# ```shell
+# export PATH="$PATH:/root/.cargo/bin"
 # ```
 
 # %%
@@ -361,10 +365,9 @@ class ConvexPlasticity:
         self.opt_problem = cp.Problem(cp.Minimize(target_expression), constrains)
         self.solver = solver
 
-
-        self.sig.value[:] = 0.0
-        self.p.value[:] = 0.0
-        # TODO: Try differentiate with cvxpylayers
+        # self.sig.value[:] = 0.0
+        # self.p.value[:] = 0.0
+        # TODO: Try to differentiate with cvxpylayers
         # self.cvxpylayer = CvxpyLayer(self.opt_problem, parameters=[self.deps, self.sig_old, self.p_old], variables=[self.sig, self.p])
         # self.dxxcvxpylayer = jax.grad(lambda deps, sig_old, p_old: self.cvxpylayer(deps, sig_old, p_old)[0][0], argnums=[0])
         # self.dyycvxpylayer = jax.grad(lambda deps, sig_old, p_old: self.cvxpylayer(deps, sig_old, p_old)[0][1], argnums=[0])
@@ -415,39 +418,51 @@ class ConvexPlasticity:
     #     result = self.dxxcvxpylayer(jax.numpy.array(self.deps.value), jax.numpy.array(self.sig_old.value), jax.numpy.array(self.p_old.value))
     #     print(result)
 
+
 # %%
 rankine = Rankine(sigt, sigc, H)
 von_mises = vonMises(sigma_0, H)
 material = Material(IsotropicElasticity(E, nu), von_mises)
 
 if patch_size_max:
-    patch_size = MPI.COMM_WORLD.allreduce(P.dofmap.index_map.size_local, op=MPI.MIN)
+    # patch_size = MPI.COMM_WORLD.allreduce(P.dofmap.index_map.size_local, op=MPI.MIN)
+    patch_size = P.dofmap.index_map.size_local
 return_mapping = ConvexPlasticity(material, patch_size, solver_name)
-tol = 1.0e-13
-scs_params = {'eps': tol, 'eps_abs': tol, 'eps_rel': tol}
+# tol = 1.0e-13
+# scs_params = {'eps': tol, 'eps_abs': tol, 'eps_rel': tol}
 conic_solver_params = {}
 
 # %%
 timer = common.Timer("DOLFINx_timer")
+
 if compiled:
+    # TODO: turn off compilation outputs
     timer.start()
-    if MPI.COMM_WORLD.rank == 0:
-        code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
-        sys.path.append(code_dir)
-        cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, prefix=f'{MPI.COMM_WORLD.rank}', gradient=False)
-        # TODO: Figure out when gradient=True will work
-    MPI.COMM_WORLD.barrier() # Wait until rank 0 has generated the code
+    code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
+    sys.path.append(code_dir)
+    cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=solver_name, prefix=f'{MPI.COMM_WORLD.rank}', gradient=False)
+    # TODO: Figure out when gradient=True will work
+    # MPI.COMM_WORLD.barrier() # Wait until rank 0 has generated the code
     
     from code_dir.cpg_solver import cpg_solve
-    solver_name = f'CPG'
+    solver_name = f'CPG_{MPI.COMM_WORLD.rank}'
     return_mapping.opt_problem.register_solve(solver_name, cpg_solve)
     
     timer.stop()
     compilation_time = timer.elapsed().total_seconds()
 
 # %%
+stress_dim = 4
+sigma_n.x.array[:] = 0.0
+p_n.x.array[:] = 0.0
+num_quadrature_points = int(sigma_n.x.array.size / stress_dim)
+
+N_patches = int(num_quadrature_points / patch_size)
+residue_size = num_quadrature_points % patch_size
+# TODO: enable compilation for non-zero residue size
+
 if MPI.COMM_WORLD.rank == 0:
-    print(f"n_quadratures_local: {P.dofmap.index_map.size_local} n_quadratures_global: {P.dofmap.index_map.size_global} n_processes: {MPI.COMM_WORLD.size} mesh_size: {h} compiled: {compiled} solver: {args.solver} patch_size: {patch_size}", flush=True)
+    print(f"n_quadratures_local: {P.dofmap.index_map.size_local} n_quadratures_global: {P.dofmap.index_map.size_global} n_processes: {MPI.COMM_WORLD.size} mesh_size: {h} compiled: {compiled} solver: {args.solver} patch_size: {patch_size} N_patches: {N_patches} residue_size: {residue_size}", flush=True)
 
 # %% [markdown]
 # Now nothing stops us from defining the implementation of the external operator
@@ -456,29 +471,6 @@ if MPI.COMM_WORLD.rank == 0:
 # tensor and the cumulative plastic increment.
 
 # %%
-stress_dim = 4
-sigma_n.x.array[:] = 0.0
-p_n.x.array[:] = 0.0
-
-# %%
-# N_patches
-
-# %%
-# residue_size
-
-# %%
-# sigma.ref_coefficient.x.array[:4*(num_quadrature_points - residue_size)].shape
-
-# %%
-# sigma.ref_coefficient.x.array[:4*(num_quadrature_points - residue_size)].reshape((-1, patch_size, 4)).shape
-# sigma.ref_coefficient.x.array[4*(num_quadrature_points - residue_size):].reshape((1, residue_size, 4)).shape
-
-
-# %%
-num_quadrature_points = int(sigma_n.x.array.size / stress_dim)
-
-N_patches = int(num_quadrature_points / patch_size)
-residue_size = num_quadrature_points % patch_size
 p_vals = np.empty_like(p.x.array)
 # p_values = p.x.array[:num_quadrature_points - residue_size].reshape((-1, patch_size))
 p_values = p_vals[:num_quadrature_points - residue_size].reshape((-1, patch_size))
@@ -599,7 +591,6 @@ def constitutive_update():
     evaluated_operands = evaluate_operands(F_external_operators)
     ((_, p_vals),) = evaluate_external_operators(F_external_operators, evaluated_operands)
     _ = evaluate_external_operators(J_external_operators, evaluated_operands)
-    # This avoids having to evaluate the external operators of F.
     # sigma.ref_coefficient.x.array[:] = sigma_new
     p.x.array[:] = p_vals
 
