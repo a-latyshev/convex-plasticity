@@ -31,3 +31,6 @@ assembling_strategies/mesh
 !geometry.png
 *.pkl
 .DS_Store
+*.json
+*.out
+*.txt
