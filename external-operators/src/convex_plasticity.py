@@ -339,7 +339,8 @@ def solve_convex_plasticity(params=None):
     if compiled:
         # TODO: turn off compilation outputs
         timer.start()
-        code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
+        jobid = params["jobid"]
+        code_dir = f'code_dirs/{jobid}_code_dir_{MPI.COMM_WORLD.rank}'
         sys.path.append(code_dir)
         cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=convex_solver, prefix=f'{MPI.COMM_WORLD.rank}', gradient=False)
         # TODO: Figure out when gradient=True will work

@@ -45,6 +45,8 @@ if not os.path.isfile(param_file):
         "mesh_size": args.h,
         # convex solver
         "solver": args.solver, "compiled": args.compiled, "patch_size_max": args.patch_size_max, "patch_size": args.patch_size,
+        # jobid
+        "jobid": jobid,
     }
 else:
     with open(param_file, 'r') as f:
