@@ -9,6 +9,7 @@ from dolfinx.fem.petsc import NonlinearProblem
 from dolfinx.fem.function import Function
 from functools import partial
 from utilities import build_cylinder_quarter, find_cell_by_point, assemble_residual_with_callback
+import importlib
 
 import basix
 import ufl
@@ -342,13 +343,23 @@ def solve_convex_plasticity(params=None):
         # TODO: turn off compilation outputs
         timer.start()
         jobid = params["jobid"]
-        code_dir = f'code_dirs/{jobid}_code_dir_{MPI.COMM_WORLD.rank}'
-        sys.path.append(code_dir)
-        cpg.generate_code(return_mapping.opt_problem, code_dir=code_dir, solver=convex_solver, prefix=f'{MPI.COMM_WORLD.rank}', gradient=False)
-        # TODO: Figure out when gradient=True will work
-        # MPI.COMM_WORLD.barrier() # Wait until rank 0 has generated the code
+        code_dir_root = f"code_dirs/jobid_{jobid}/"
+        os.makedirs(code_dir_root, exist_ok=True)
+        os.chdir(code_dir_root)
+
+        code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
+        os.makedirs(code_dir, exist_ok=True)
+
+        cpg.generate_code(
+            return_mapping.opt_problem, 
+            code_dir=code_dir, 
+            solver=convex_solver, 
+            prefix=f'{MPI.COMM_WORLD.rank}', 
+            gradient=False
+        )
         
-        from code_dir.cpg_solver import cpg_solve
+        module = importlib.import_module(f"{code_dir}.cpg_solver")
+        cpg_solve = module.cpg_solve
         convex_solver = f'CPG_{MPI.COMM_WORLD.rank}'
         return_mapping.opt_problem.register_solve(convex_solver, cpg_solve)
         
@@ -557,11 +568,11 @@ def solve_convex_plasticity(params=None):
         if compiled:
             output_data["compilation_time"] = compilation_time
         
-        os.makedirs("./output", exist_ok=True)
+        os.makedirs("../output", exist_ok=True)
         filename = (
             f"output_-{convex_solver}_-{patch_size}_-{n_processes}_{h}_{compiled}.pkl"
         )
-        output_data["output_file"] = os.path.join("./output", filename)
+        output_data["output_file"] = os.path.join("../output", filename)
         print(output_data, flush=True)
         output_data_to_store = {**params, **output_data}
         with open(output_data["output_file"], "wb") as f:
