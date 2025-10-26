@@ -343,13 +343,8 @@ def solve_convex_plasticity(params=None):
         # TODO: turn off compilation outputs
         timer.start()
         jobid = params["jobid"]
-        code_dir_root = f"code_dirs/jobid_{jobid}/"
-        os.makedirs(code_dir_root, exist_ok=True)
-        os.chdir(code_dir_root)
-
-        code_dir = f'code_dir_{MPI.COMM_WORLD.rank}'
-        os.makedirs(code_dir, exist_ok=True)
-
+        code_dir = f'jobid_{jobid}_code_dir_{MPI.COMM_WORLD.rank}'
+        # TODO: comeback to the issue with paths later
         cpg.generate_code(
             return_mapping.opt_problem, 
             code_dir=code_dir, 
@@ -568,11 +563,13 @@ def solve_convex_plasticity(params=None):
         if compiled:
             output_data["compilation_time"] = compilation_time
         
-        os.makedirs("../output", exist_ok=True)
+        output_path = params["output_dir"]
+        
+        os.makedirs(output_path, exist_ok=True)
         filename = (
             f"output_-{convex_solver}_-{patch_size}_-{n_processes}_{h}_{compiled}.pkl"
         )
-        output_data["output_file"] = os.path.join("../output", filename)
+        output_data["output_file"] = os.path.join(output_path, filename)
         print(output_data, flush=True)
         output_data_to_store = {**params, **output_data}
         with open(output_data["output_file"], "wb") as f:

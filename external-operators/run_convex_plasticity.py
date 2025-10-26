@@ -18,6 +18,8 @@ def solve_convex_plasticity_generic(varying_parameters):
         "mesh_size": 0.3,
         # convex solver
         "solver": "CLARABEL", "compiled": False, "patch_size_max": True, "patch_size": None,
+        # IO
+        "output_dir": str(Path(__file__).resolve().parent) + "/output/",
         **varying_parameters # update default parameters
     }
 

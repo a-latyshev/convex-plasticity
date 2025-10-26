@@ -34,3 +34,4 @@ assembling_strategies/mesh
 *.json
 *.out
 *.txt
+**/**_code_dir_**/**

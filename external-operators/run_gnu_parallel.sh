@@ -9,7 +9,7 @@ PARAM_FILE="parameters.json"
 # Create a directory for individual parameter files
 
 # JOB_ID=$(uuidgen)
-JOB_ID="$(date +%Y%m%d%H%M%S)-$$"
+JOB_ID="$(date +%Y%m%d%H%M%S)_$$"
 PARAMS_DIR="logs/${JOB_ID}/params"
 mkdir -p "$PARAMS_DIR"
 
@@ -26,7 +26,7 @@ for i, param in enumerate(params):
 
 # Create a list of all parameter files
 PARAMS_LIST_FILE="logs/${JOB_ID}/params_list.txt"
-find "$PARAMS_DIR" -name 'param_*.json' | sort > "$PARAMS_LIST_FILE"
+find "$PARAMS_DIR" -name 'param_*.json' -printf '%f\n' | sort > "$PARAMS_LIST_FILE"
 
 # Define the parallel job log file
 PARALLEL_JOBLOG_FILE="logs/${JOB_ID}/${JOB_ID}-parallel.out"
@@ -39,8 +39,11 @@ echo "Starting parallel..."
 export PATH="$PATH:/root/.cargo/bin"
 parallel --delay 0.2 --jobs 8 \
     --joblog ${PARALLEL_JOBLOG_FILE} \
-    "NUM_PROC=\$(python3 -c 'import json; print(json.load(open(\"{}\"))[\"n_processes\"])'); \
-     mpirun -n \$NUM_PROC python3 run_convex_plasticity.py --param_file {} --jobid JOB_ID > logs/${JOB_ID}/job_{#}.out 2>&1" \
+    "PARAM_FILE_NAME=\"{}\"; \
+     PARAM_FILE_FULL=\"logs/${JOB_ID}/params/\$PARAM_FILE_NAME\"; \
+     NUM_PROC=\$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' \"\$PARAM_FILE_FULL\" n_processes); \
+     cd ./logs/${JOB_ID}; \
+     mpirun -n \$NUM_PROC python3 ../../run_convex_plasticity.py --param_file params/\$PARAM_FILE_NAME --jobid ${JOB_ID}_{#} > job_{#}.out 2>&1" \
     :::: ${PARAMS_LIST_FILE}
 
 echo "Finished."

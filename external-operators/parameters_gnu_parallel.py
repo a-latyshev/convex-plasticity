@@ -4,10 +4,10 @@ import numpy as np
 solvers = ["CLARABEL", "MOSEK"]
 n_processes = [1, 4, 8, 16]
 mesh_sizes = [0.3, 0.06, 0.025, 0.01]
-compiled_options = [True, False]
+compiled_options = [True]
 
 solvers = ["CLARABEL"]
-n_processes = [2]
+n_processes = [5, 6]
 mesh_sizes = [0.3]
 
 params = []
