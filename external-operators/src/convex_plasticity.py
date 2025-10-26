@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 import numba
 import numpy as np
 from demo_plasticity_von_mises_pure_ufl import plasticity_von_mises_pure_ufl
-from solvers import PETScNonlinearProblem, PETScNonlinearSolver
-from utilities import build_cylinder_quarter, find_cell_by_point
+from dolfinx.fem.petsc import NonlinearProblem
+from dolfinx.fem.function import Function
+from functools import partial
+from utilities import build_cylinder_quarter, find_cell_by_point, assemble_residual_with_callback
 
 import basix
 import ufl
@@ -455,14 +457,6 @@ def solve_convex_plasticity(params=None):
     F_form = fem.form(F_replaced)
     J_form = fem.form(J_replaced)
 
-    def constitutive_update():
-        evaluated_operands = evaluate_operands(F_external_operators)
-        ((_, p_vals),) = evaluate_external_operators(F_external_operators, evaluated_operands)
-        _ = evaluate_external_operators(J_external_operators, evaluated_operands)
-        p.x.array[:] = p_vals
-
-    problem = PETScNonlinearProblem(Du, F_replaced, J_replaced, bcs=bcs, external_callback=constitutive_update)
-
     petsc_options = {
         "snes_type": "qn",
         "snes_qn_type": "lbfgs", #lbfgs broyden, badbroyden
@@ -478,7 +472,33 @@ def solve_convex_plasticity(params=None):
         # "snes_monitor": "",
     }
 
-    solver = PETScNonlinearSolver(mesh.comm, problem, petsc_options=petsc_options)  # PETSc.SNES wrapper
+    problem = NonlinearProblem(
+        F_replaced, Du, J=J_replaced, bcs=bcs, petsc_options_prefix="demo_von_mises_", petsc_options=petsc_options
+    )
+
+    def constitutive_update(
+        F_external_operators: list[FEMExternalOperator], J_external_operators: list[FEMExternalOperator], dp: Function
+    ):
+        """Update the constitutive model by evaluating the external operators."""
+        evaluated_operands = evaluate_operands(F_external_operators)
+        ((_, p_vals),) = evaluate_external_operators(F_external_operators, evaluated_operands)
+        # Update history variable
+        _ = evaluate_external_operators(J_external_operators, evaluated_operands) # TODO: drop this, initialize C_tang only once
+        p.x.array[:] = p_vals
+
+    assemble_residual_with_callback_ = partial(
+        assemble_residual_with_callback,
+        problem.u,
+        problem.F,
+        problem.J,
+        bcs,
+        constitutive_update,  # external callback with respect to SNES
+        [F_external_operators, J_external_operators, dp],  # input arguments of the callback
+    )
+
+    # Set the custom residual assembly function with the one that calls
+    # `constitutive_update`
+    problem.solver.setFunction(assemble_residual_with_callback_, problem.b)
 
     timer.start()
 
@@ -502,9 +522,12 @@ def solve_convex_plasticity(params=None):
         loading.value = loading_v
         Du.x.array[:] = eps
 
-        iters, _ = solver.solve(Du)
+        _ = problem.solve()
+
+        iters = problem.solver.getIterationNumber()
         if MPI.COMM_WORLD.rank == 0:
             print(f"\tInner Newton iterations: {iters}", flush=True)
+
 
         u.x.petsc_vec.axpy(1.0, Du.x.petsc_vec)
         u.x.scatter_forward()
