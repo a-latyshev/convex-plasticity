@@ -40,7 +40,7 @@ export PATH="$PATH:/root/.cargo/bin"
 parallel --delay 0.2 --jobs 8 \
     --joblog ${PARALLEL_JOBLOG_FILE} \
     "NUM_PROC=\$(python3 -c 'import json; print(json.load(open(\"{}\"))[\"n_processes\"])'); \
-     mpirun -n \$NUM_PROC python3 run_convex_plasticity.py {} $JOB_ID > logs/${JOB_ID}/job_{#}.out 2>&1" \
+     mpirun -n \$NUM_PROC python3 run_convex_plasticity.py --param_file {} --jobid JOB_ID > logs/${JOB_ID}/job_{#}.out 2>&1" \
     :::: ${PARAMS_LIST_FILE}
 
 echo "Finished."

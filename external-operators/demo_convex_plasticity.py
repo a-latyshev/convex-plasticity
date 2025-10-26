@@ -438,7 +438,7 @@ conic_solver_params = {}
 
 # %%
 timer = common.Timer("DOLFINx_timer")
-
+compiled = True
 if compiled:
     # TODO: turn off compilation outputs
     timer.start()
