@@ -566,8 +566,9 @@ def solve_convex_plasticity(params=None):
         output_path = params["output_dir"]
         
         os.makedirs(output_path, exist_ok=True)
+        solver_ = params["solver"]
         filename = (
-            f"output_-{convex_solver}_-{patch_size}_-{n_processes}_{h}_{compiled}.pkl"
+            f"output_-{solver_}_-{patch_size}_-{n_processes}_{h}_{compiled}.pkl"
         )
         output_data["output_file"] = os.path.join(output_path, filename)
         print(output_data, flush=True)
